@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@config "../tailwind.config.js";
+
+/* Tailwind 4 CSS-only configuration */
+@variant dark (.dark &);
+
+/* Content paths for purging */
+@source "../src/**/*.{vue,js,ts,jsx,tsx}";
+@source "../index.html";

@@ -1,0 +1,131 @@
+class ApiClient {
+  constructor(baseURL = '/api') {
+    this.baseURL = baseURL;
+  }
+
+  // Get token from localStorage
+  getToken() {
+    return localStorage.getItem('auth_token');
+  }
+
+  // Set token in localStorage
+  setToken(token) {
+    localStorage.setItem('auth_token', token);
+  }
+
+  // Remove token from localStorage
+  removeToken() {
+    localStorage.removeItem('auth_token');
+  }
+
+  // Build headers with optional auth token
+  buildHeaders(customHeaders = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      ...customHeaders
+    };
+
+    const token = this.getToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    return headers;
+  }
+
+  // Main fetch wrapper with interceptor-like functionality
+  async request(endpoint, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    
+    const config = {
+      ...options,
+      headers: this.buildHeaders(options.headers)
+    };
+
+    try {
+      const response = await fetch(url, config);
+      
+      // Handle 401 - remove token and redirect to login
+      if (response.status === 401) {
+        this.removeToken();
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+        throw new Error('Unauthorized');
+      }
+
+      // Parse JSON response
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Request failed');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('API Error:', error);
+      throw error;
+    }
+  }
+
+  // HTTP Methods
+  async get(endpoint, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'GET'
+    });
+  }
+
+  async post(endpoint, data = null, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'POST',
+      body: data ? JSON.stringify(data) : null
+    });
+  }
+
+  async put(endpoint, data = null, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : null
+    });
+  }
+
+  async delete(endpoint, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'DELETE'
+    });
+  }
+
+  // Auth specific methods
+  async login(identity, password) {
+    const response = await this.post('/auth/login', { identity, password });
+    if (response.success && response.data.token) {
+      this.setToken(response.data.token);
+    }
+    return response;
+  }
+
+  async logout() {
+    try {
+      await this.post('/auth/logout');
+    } finally {
+      this.removeToken();
+    }
+  }
+
+  async me() {
+    return this.get('/auth/me');
+  }
+
+  // Check if user is authenticated
+  isAuthenticated() {
+    return !!this.getToken();
+  }
+}
+
+// Create and export singleton instance
+export const api = new ApiClient();
+export default api;
