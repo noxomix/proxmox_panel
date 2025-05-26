@@ -31,15 +31,20 @@ class Token {
     const tokenHash = await this.hashToken(token);
     const expiresAt = new Date(Date.now() + (expiresInHours * 60 * 60 * 1000));
 
-    const [id] = await db(this.tableName).insert({
+    // MySQL doesn't support .returning(), so we insert and then find by unique token_hash
+    await db(this.tableName).insert({
       user_id: userId,
       token_hash: tokenHash,
       type: type,
       expires_at: expiresAt
-    }).returning('id');
+    });
 
-    const tokenRecord = await this.findById(id);
-    return { token, record: tokenRecord };
+    // Find the created token by token_hash (which is unique)
+    const tokenRecord = await db(this.tableName)
+      .where('token_hash', tokenHash)
+      .first();
+    
+    return { token, record: new Token(tokenRecord) };
   }
 
   static async findById(id) {

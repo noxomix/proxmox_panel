@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import bcrypt from 'bcrypt';
 
 /**
@@ -8,10 +9,12 @@ export const seed = async function(knex) {
   // Deletes ALL existing entries
   await knex('users').del();
   
-  // Hash the password
+  // Hash the password with current environment APPLICATION_SECRET
   const saltRounds = 12;
   const pepper = process.env.APPLICATION_SECRET || 'fallback-secret';
   const hashedPassword = await bcrypt.hash('123' + pepper, saltRounds);
+  
+  console.log('Seeding user with APPLICATION_SECRET:', pepper);
   
   // Inserts seed entries
   await knex('users').insert([
@@ -22,4 +25,6 @@ export const seed = async function(knex) {
       status: 'active'
     }
   ]);
+  
+  console.log('User "theo" seeded successfully with password "123"');
 };

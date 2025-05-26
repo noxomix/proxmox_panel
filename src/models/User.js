@@ -34,8 +34,9 @@ class User {
   }
 
   static async create(userData) {
-    const [id] = await db(this.tableName).insert(userData).returning('id');
-    return this.findById(id);
+    // MySQL doesn't support .returning(), so we insert and then find by email (which is unique)
+    await db(this.tableName).insert(userData);
+    return this.findByEmail(userData.email);
   }
 
   static async findAll() {
