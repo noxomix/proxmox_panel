@@ -1,0 +1,28 @@
+{
+  "name": "proxmox-panel-api",
+  "version": "1.0.0",
+  "description": "Hosting Control Panel API mit Hono",
+  "main": "src/index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "migrate": "knex migrate:latest",
+    "migrate:rollback": "knex migrate:rollback",
+    "migrate:make": "knex migrate:make"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.3",
+    "dotenv": "^16.5.0",
+    "hono": "^4.0.0",
+    "knex": "^3.1.0",
+    "mysql2": "^3.14.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}
