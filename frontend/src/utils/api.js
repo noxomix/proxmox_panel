@@ -120,6 +120,39 @@ class ApiClient {
     return this.get('/auth/me');
   }
 
+  // Change password
+  async changePassword(currentPassword, newPassword) {
+    return this.post('/auth/change-password', {
+      currentPassword,
+      newPassword
+    });
+  }
+
+  // Generate API token
+  async generateApiToken() {
+    return this.post('/auth/generate-api-token');
+  }
+
+  // Get current API token
+  async getCurrentApiToken() {
+    return this.get('/auth/api-token');
+  }
+
+  // Get active sessions
+  async getSessions() {
+    return this.get('/auth/sessions');
+  }
+
+  // Revoke session
+  async revokeSession(sessionId) {
+    return this.delete(`/auth/sessions/${sessionId}`);
+  }
+
+  // Revoke all other sessions
+  async revokeAllSessions() {
+    return this.delete('/auth/sessions/all');
+  }
+
   // Check if user is authenticated
   isAuthenticated() {
     return !!this.getToken();

@@ -1,0 +1,436 @@
+<template>
+  <div class="max-w-4xl mx-auto space-y-8">
+    <!-- Page Header -->
+    <div class="border-b border-gray-200 dark:border-gray-700 pb-6">
+      <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Profile & API</h1>
+      <p class="text-gray-600 dark:text-gray-400 mt-2">Manage your account settings and API access</p>
+    </div>
+
+    <!-- Password Change Section -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-4">Change Password</h2>
+      
+      <form @submit.prevent="changePassword" class="space-y-4">
+        <!-- Current Password -->
+        <div>
+          <label for="currentPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Current Password
+          </label>
+          <div class="relative">
+            <input
+              id="currentPassword"
+              v-model="passwordForm.currentPassword"
+              :type="showCurrentPassword ? 'text' : 'password'"
+              required
+              class="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              placeholder="Enter your current password"
+              :disabled="passwordLoading"
+            />
+            <button
+              type="button"
+              @click="showCurrentPassword = !showCurrentPassword"
+              class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              :disabled="passwordLoading"
+            >
+              <EyeIcon v-if="showCurrentPassword" className="w-5 h-5" />
+              <EyeSlashIcon v-else className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <!-- New Password -->
+        <div>
+          <label for="newPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            New Password
+          </label>
+          <div class="relative">
+            <input
+              id="newPassword"
+              v-model="passwordForm.newPassword"
+              :type="showNewPassword ? 'text' : 'password'"
+              required
+              class="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              placeholder="Enter your new password"
+              :disabled="passwordLoading"
+            />
+            <button
+              type="button"
+              @click="showNewPassword = !showNewPassword"
+              class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              :disabled="passwordLoading"
+            >
+              <EyeIcon v-if="showNewPassword" className="w-5 h-5" />
+              <EyeSlashIcon v-else className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Confirm Password -->
+        <div>
+          <label for="confirmPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Confirm New Password
+          </label>
+          <div class="relative">
+            <input
+              id="confirmPassword"
+              v-model="passwordForm.confirmPassword"
+              :type="showConfirmPassword ? 'text' : 'password'"
+              required
+              class="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              placeholder="Confirm your new password"
+              :disabled="passwordLoading"
+            />
+            <button
+              type="button"
+              @click="showConfirmPassword = !showConfirmPassword"
+              class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              :disabled="passwordLoading"
+            >
+              <EyeIcon v-if="showConfirmPassword" className="w-5 h-5" />
+              <EyeSlashIcon v-else className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Password Error -->
+        <div v-if="passwordError" class="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+          <p class="text-sm text-red-700 dark:text-red-400">{{ passwordError }}</p>
+        </div>
+
+        <!-- Password Success -->
+        <div v-if="passwordSuccess" class="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+          <p class="text-sm text-green-700 dark:text-green-400">{{ passwordSuccess }}</p>
+        </div>
+
+        <!-- Submit Button -->
+        <button
+          type="submit"
+          :disabled="passwordLoading"
+          class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
+        >
+          <span v-if="passwordLoading" class="flex items-center">
+            <SpinnerIcon />
+            Changing Password...
+          </span>
+          <span v-else>Change Password</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- API Token Section -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">API Token</h2>
+        <button
+          @click="generateApiToken"
+          :disabled="tokenLoading"
+          class="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-all text-sm"
+        >
+          <span v-if="tokenLoading" class="flex items-center">
+            <SpinnerIcon />
+            Generating...
+          </span>
+          <span v-else>Generate New Token</span>
+        </button>
+      </div>
+
+      <p class="text-gray-600 dark:text-gray-400 mb-4">
+        API tokens allow you to authenticate with the API. Tokens expire after 365 days.
+      </p>
+
+      <!-- Current API Token -->
+      <div v-if="currentApiToken" class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mb-4">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-xs text-gray-500 dark:text-gray-400">Current API Token:</p>
+          <CopyButton :text="currentApiToken" />
+        </div>
+        <code class="text-sm text-gray-900 dark:text-white font-mono break-all">
+          {{ currentApiToken }}
+        </code>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+          Expires: {{ formatDate(apiTokenExpiry) }}
+        </p>
+      </div>
+
+      <!-- Token Error -->
+      <div v-if="tokenError" class="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 mb-4">
+        <p class="text-sm text-red-700 dark:text-red-400">{{ tokenError }}</p>
+      </div>
+    </div>
+
+    <!-- Active Sessions Section -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Active Sessions</h2>
+        <div class="flex items-center space-x-3">
+          <button
+            @click="revokeAllSessions"
+            :disabled="sessionsLoading || sessions.length <= 1"
+            class="text-xs px-3 py-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Sign out all other devices
+          </button>
+          <button
+            @click="loadSessions"
+            :disabled="sessionsLoading"
+            class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
+          >
+            <span v-if="sessionsLoading">Loading...</span>
+            <span v-else>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <p class="text-gray-600 dark:text-gray-400 mb-4">
+        Manage your active login sessions across different devices and browsers.
+      </p>
+
+      <!-- Sessions List -->
+      <div v-if="sessions.length > 0" class="space-y-3">
+        <div
+          v-for="session in sessions"
+          :key="session.id"
+          class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex items-center justify-between"
+        >
+          <div class="flex-1">
+            <div class="flex items-center space-x-2 mb-1">
+              <span class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ session.user_agent || 'Unknown Browser' }}
+              </span>
+              <span v-if="session.is_current" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                Current Session
+              </span>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              IP: {{ session.ip_address || 'Unknown' }} • 
+              Last active: {{ formatDate(session.updated_at) }} •
+              Expires: {{ formatDate(session.expires_at) }}
+            </p>
+          </div>
+          <button
+            @click="session.is_current ? handleCurrentSessionLogout() : revokeSession(session.id)"
+            class="ml-4 text-xs px-2 py-1 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
+          >
+            Sign out{{ session.is_current ? ' (current)' : '' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="!sessionsLoading" class="text-center py-8">
+        <p class="text-gray-500 dark:text-gray-400">No active sessions found</p>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="sessionsLoading" class="text-center py-8">
+        <SpinnerIcon />
+        <p class="text-gray-500 dark:text-gray-400 mt-2">Loading sessions...</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import api from '../utils/api.js'
+import EyeIcon from '../components/icons/EyeIcon.vue'
+import EyeSlashIcon from '../components/icons/EyeSlashIcon.vue'
+import SpinnerIcon from '../components/icons/SpinnerIcon.vue'
+import CopyButton from '../components/CopyButton.vue'
+
+export default {
+  name: 'Profile',
+  components: {
+    EyeIcon,
+    EyeSlashIcon,
+    SpinnerIcon,
+    CopyButton
+  },
+  setup() {
+    const router = useRouter()
+    
+    // Password Change
+    const passwordForm = ref({
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    })
+    const showCurrentPassword = ref(false)
+    const showNewPassword = ref(false)
+    const showConfirmPassword = ref(false)
+    const passwordLoading = ref(false)
+    const passwordError = ref('')
+    const passwordSuccess = ref('')
+
+    // API Token
+    const currentApiToken = ref('')
+    const apiTokenExpiry = ref('')
+    const tokenLoading = ref(false)
+    const tokenError = ref('')
+
+    // Sessions
+    const sessions = ref([])
+    const sessionsLoading = ref(false)
+
+    onMounted(async () => {
+      if (!api.isAuthenticated()) {
+        router.push('/login')
+        return
+      }
+      
+      await loadSessions()
+      await loadApiToken()
+    })
+
+    const changePassword = async () => {
+      passwordError.value = ''
+      passwordSuccess.value = ''
+
+      if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+        passwordError.value = 'New passwords do not match'
+        return
+      }
+
+      if (passwordForm.value.newPassword.length < 6) {
+        passwordError.value = 'New password must be at least 6 characters long'
+        return
+      }
+
+      passwordLoading.value = true
+
+      try {
+        const response = await api.changePassword(
+          passwordForm.value.currentPassword,
+          passwordForm.value.newPassword
+        )
+
+        if (response.success) {
+          passwordSuccess.value = 'Password changed successfully'
+          passwordForm.value = {
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: ''
+          }
+        } else {
+          passwordError.value = response.message || 'Failed to change password'
+        }
+      } catch (error) {
+        passwordError.value = error.message || 'Failed to change password'
+      } finally {
+        passwordLoading.value = false
+      }
+    }
+
+    const generateApiToken = async () => {
+      tokenError.value = ''
+      tokenLoading.value = true
+
+      try {
+        const response = await api.generateApiToken()
+
+        if (response.success) {
+          currentApiToken.value = response.data.token
+          apiTokenExpiry.value = response.data.expires_at
+        } else {
+          tokenError.value = response.message || 'Failed to generate API token'
+        }
+      } catch (error) {
+        tokenError.value = error.message || 'Failed to generate API token'
+      } finally {
+        tokenLoading.value = false
+      }
+    }
+
+    const loadApiToken = async () => {
+      try {
+        const response = await api.getCurrentApiToken()
+        if (response.success && response.data) {
+          currentApiToken.value = response.data.token
+          apiTokenExpiry.value = response.data.expires_at
+        }
+      } catch (error) {
+        console.error('Failed to load API token:', error)
+      }
+    }
+
+
+    const loadSessions = async () => {
+      sessionsLoading.value = true
+
+      try {
+        const response = await api.getSessions()
+        if (response.success) {
+          sessions.value = response.data || []
+        }
+      } catch (error) {
+        console.error('Failed to load sessions:', error)
+      } finally {
+        sessionsLoading.value = false
+      }
+    }
+
+    const revokeSession = async (sessionId) => {
+      try {
+        const response = await api.revokeSession(sessionId)
+        if (response.success) {
+          sessions.value = sessions.value.filter(s => s.id !== sessionId)
+        }
+      } catch (error) {
+        console.error('Failed to revoke session:', error)
+      }
+    }
+
+    const revokeAllSessions = async () => {
+      try {
+        const response = await api.revokeAllSessions()
+        if (response.success) {
+          // Keep only current session
+          sessions.value = sessions.value.filter(s => s.is_current)
+        }
+      } catch (error) {
+        console.error('Failed to revoke all sessions:', error)
+      }
+    }
+
+    const handleCurrentSessionLogout = async () => {
+      try {
+        await api.logout()
+        router.push('/login')
+      } catch (error) {
+        console.error('Logout error:', error)
+        router.push('/login')
+      }
+    }
+
+    const formatDate = (dateString) => {
+      if (!dateString) return 'Unknown'
+      return new Date(dateString).toLocaleString()
+    }
+
+    return {
+      passwordForm,
+      showCurrentPassword,
+      showNewPassword,
+      showConfirmPassword,
+      passwordLoading,
+      passwordError,
+      passwordSuccess,
+      currentApiToken,
+      apiTokenExpiry,
+      tokenLoading,
+      tokenError,
+      sessions,
+      sessionsLoading,
+      changePassword,
+      generateApiToken,
+      loadApiToken,
+      loadSessions,
+      revokeSession,
+      revokeAllSessions,
+      handleCurrentSessionLogout,
+      formatDate
+    }
+  }
+}
+</script>

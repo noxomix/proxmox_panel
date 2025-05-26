@@ -63,6 +63,18 @@ class User {
     const { password, ...userWithoutPassword } = this;
     return userWithoutPassword;
   }
+
+  // Update password
+  static async updatePassword(userId, hashedPassword) {
+    await db('users')
+      .where('id', userId)
+      .update({
+        password: hashedPassword,
+        updated_at: new Date()
+      });
+    
+    return this.findById(userId);
+  }
 }
 
 export default User;

@@ -7,7 +7,10 @@ class Token {
     this.id = data.id;
     this.user_id = data.user_id;
     this.token_hash = data.token_hash;
+    this.token = data.token; // For API tokens
     this.type = data.type;
+    this.ip_address = data.ip_address;
+    this.user_agent = data.user_agent;
     this.expires_at = data.expires_at;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
@@ -26,7 +29,7 @@ class Token {
     return await bcrypt.hash(token + pepper, 12);
   }
 
-  static async create(userId, type = 'session', expiresInHours = 24) {
+  static async create(userId, type = 'session', expiresInHours = 24, ipAddress = null, userAgent = null) {
     const token = await this.generateToken();
     const tokenHash = await this.hashToken(token);
     const expiresAt = new Date(Date.now() + (expiresInHours * 60 * 60 * 1000));
@@ -36,7 +39,11 @@ class Token {
       user_id: userId,
       token_hash: tokenHash,
       type: type,
-      expires_at: expiresAt
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      expires_at: expiresAt,
+      created_at: new Date(),
+      updated_at: new Date()
     });
 
     // Find the created token by token_hash (which is unique)
@@ -54,14 +61,31 @@ class Token {
 
   static async findByToken(token) {
     const pepper = process.env.APPLICATION_SECRET || 'fallback-secret';
-    const allTokens = await db(this.tableName)
+    
+    // First check for API tokens (plain text comparison)
+    const apiToken = await db(this.tableName)
+      .where('token', token)
+      .where('type', 'api')
       .where('expires_at', '>', new Date())
+      .first();
+    
+    if (apiToken) {
+      return new Token(apiToken);
+    }
+    
+    // Then check for session tokens (hashed comparison)
+    const sessionTokens = await db(this.tableName)
+      .where('type', 'session')
+      .where('expires_at', '>', new Date())
+      .whereNotNull('token_hash')
       .select('*');
 
-    for (const tokenData of allTokens) {
-      const isValid = await bcrypt.compare(token + pepper, tokenData.token_hash);
-      if (isValid) {
-        return new Token(tokenData);
+    for (const tokenData of sessionTokens) {
+      if (tokenData.token_hash) {
+        const isValid = await bcrypt.compare(token + pepper, tokenData.token_hash);
+        if (isValid) {
+          return new Token(tokenData);
+        }
       }
     }
     return null;
@@ -129,6 +153,14 @@ class Token {
       .del();
   }
 
+  static async revokeAllUserSessionsExceptCurrent(userId, currentTokenId) {
+    return await db(this.tableName)
+      .where('user_id', userId)
+      .where('type', 'session')
+      .whereNot('id', currentTokenId)
+      .del();
+  }
+
   async updateExpiry(newExpiresAt) {
     await db(Token.tableName)
       .where('id', this.id)
@@ -155,6 +187,53 @@ class Token {
       created_at: this.created_at,
       updated_at: this.updated_at
     };
+  }
+
+  // Create API token with plain token storage
+  static async createApiToken(tokenData) {
+    await db(this.tableName).insert({
+      ...tokenData,
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+
+    // Find the created token
+    const token = await db(this.tableName)
+      .where('user_id', tokenData.user_id)
+      .where('type', tokenData.type)
+      .orderBy('created_at', 'desc')
+      .first();
+    
+    return token ? new Token(token) : null;
+  }
+
+  // Get latest API token for user
+  static async getLatestApiToken(userId) {
+    const token = await db(this.tableName)
+      .where('user_id', userId)
+      .where('type', 'api')
+      .where('expires_at', '>', new Date())
+      .orderBy('created_at', 'desc')
+      .first();
+    
+    return token ? new Token(token) : null;
+  }
+
+  // Get active sessions for user
+  static async getActiveSessions(userId) {
+    const sessions = await db(this.tableName)
+      .where('user_id', userId)
+      .where('type', 'session')
+      .where('expires_at', '>', new Date())
+      .orderBy('updated_at', 'desc')
+      .select('id', 'created_at', 'updated_at', 'expires_at', 'ip_address', 'user_agent');
+    
+    return sessions;
+  }
+
+  // Delete token by ID
+  static async deleteById(id) {
+    return await db(this.tableName).where('id', id).del();
   }
 }
 

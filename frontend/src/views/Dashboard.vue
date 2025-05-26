@@ -58,13 +58,7 @@
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
         <div class="flex items-center justify-between mb-4">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Authentication Token</h3>
-          <button
-            @click="copyToken"
-            class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
-          >
-            <CopyIcon className="w-4 h-4 mr-1" />
-            {{ copied ? 'Copied!' : 'Copy' }}
-          </button>
+          <CopyButton :text="currentToken" />
         </div>
         
         <div class="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
@@ -128,7 +122,7 @@ import api from '../utils/api.js'
 import CheckIcon from '../components/icons/CheckIcon.vue'
 import UserIcon from '../components/icons/UserIcon.vue'
 import LockIcon from '../components/icons/LockIcon.vue'
-import CopyIcon from '../components/icons/CopyIcon.vue'
+import CopyButton from '../components/CopyButton.vue'
 
 export default {
   name: 'Dashboard',
@@ -136,14 +130,13 @@ export default {
     CheckIcon,
     UserIcon,
     LockIcon,
-    CopyIcon
+    CopyButton
   },
   setup() {
     const router = useRouter()
     const user = ref(null)
     const currentToken = ref('')
     const tokenExpiry = ref('')
-    const copied = ref(false)
     const loading = ref(true)
 
     onMounted(async () => {
@@ -170,19 +163,6 @@ export default {
       }
     })
 
-    const copyToken = async () => {
-      if (currentToken.value) {
-        try {
-          await navigator.clipboard.writeText(currentToken.value)
-          copied.value = true
-          setTimeout(() => {
-            copied.value = false
-          }, 2000)
-        } catch (error) {
-          console.error('Failed to copy token:', error)
-        }
-      }
-    }
 
     const formatDate = (dateString) => {
       if (!dateString) return null
@@ -193,9 +173,7 @@ export default {
       user,
       currentToken,
       tokenExpiry,
-      copied,
       loading,
-      copyToken,
       formatDate
     }
   }

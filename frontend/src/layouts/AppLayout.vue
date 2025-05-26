@@ -26,36 +26,29 @@
       </div>
 
       <!-- Sidebar Navigation -->
-      <nav class="mt-4 px-2">
+      <nav class="mt-6 px-3">
         <ul class="space-y-2">
-          <li>
-            <router-link
-              to="/dashboard"
-              class="flex items-center px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              :class="{ 'justify-center': sidebarCollapsed }"
-            >
-              <UserIcon className="w-5 h-5" />
-              <span v-if="!sidebarCollapsed" class="ml-3">Dashboard</span>
-            </router-link>
-          </li>
-          <li>
-            <button
-              class="w-full flex items-center px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              :class="{ 'justify-center': sidebarCollapsed }"
-            >
-              <ShieldIcon className="w-5 h-5" />
-              <span v-if="!sidebarCollapsed" class="ml-3">Security</span>
-            </button>
-          </li>
-          <li>
-            <button
-              class="w-full flex items-center px-3 py-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              :class="{ 'justify-center': sidebarCollapsed }"
-            >
-              <LockIcon className="w-5 h-5" />
-              <span v-if="!sidebarCollapsed" class="ml-3">Settings</span>
-            </button>
-          </li>
+          <SidebarLink 
+            to="/dashboard" 
+            :icon="DashboardIcon" 
+            :sidebarCollapsed="sidebarCollapsed"
+          >
+            Dashboard
+          </SidebarLink>
+          
+          <SidebarLink 
+            :icon="ShieldIcon" 
+            :sidebarCollapsed="sidebarCollapsed"
+          >
+            Security
+          </SidebarLink>
+          
+          <SidebarLink 
+            :icon="LockIcon" 
+            :sidebarCollapsed="sidebarCollapsed"
+          >
+            Settings
+          </SidebarLink>
         </ul>
       </nav>
     </aside>
@@ -101,10 +94,19 @@
                 <!-- Dropdown Menu -->
                 <div v-if="showUserMenu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-10">
                   <div class="py-1">
+                    <router-link
+                      to="/profile"
+                      @click="showUserMenu = false"
+                      class="w-full flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+                    >
+                      <UserSettingsIcon className="w-4 h-4 mr-2" />
+                      Profile & API
+                    </router-link>
                     <button
                       @click="handleLogout"
-                      class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      class="w-full flex items-center px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-700 dark:hover:text-rose-300 transition-all duration-200"
                     >
+                      <LogoutIcon className="w-4 h-4 mr-2" />
                       Sign out
                     </button>
                   </div>
@@ -144,6 +146,10 @@ import GorillaAvatarIcon from '../components/icons/GiraffeAvatarIcon.vue'
 import DarkModeToggle from '../components/DarkModeToggle.vue'
 import AppLogo from '../components/AppLogo.vue'
 import SidebarToggle from '../components/SidebarToggle.vue'
+import SidebarLink from '../components/SidebarLink.vue'
+import LogoutIcon from '../components/icons/LogoutIcon.vue'
+import DashboardIcon from '../components/icons/DashboardIcon.vue'
+import UserSettingsIcon from '../components/icons/UserSettingsIcon.vue'
 
 export default {
   name: 'AppLayout',
@@ -155,7 +161,11 @@ export default {
     GorillaAvatarIcon,
     DarkModeToggle,
     AppLogo,
-    SidebarToggle
+    SidebarToggle,
+    SidebarLink,
+    LogoutIcon,
+    DashboardIcon,
+    UserSettingsIcon
   },
   setup() {
     const router = useRouter()
@@ -238,7 +248,11 @@ export default {
       showMobileSidebar,
       pageTitle,
       toggleSidebar,
-      handleLogout
+      handleLogout,
+      UserIcon,
+      ShieldIcon,
+      LockIcon,
+      DashboardIcon
     }
   }
 }
