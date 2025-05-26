@@ -3,6 +3,8 @@ import bcrypt from 'bcrypt';
 import User from '../../models/User.js';
 import Token from '../../models/Token.js';
 import { apiResponse } from '../../utils/response.js';
+import { authMiddleware } from '../../middleware/auth.js';
+import { getAuthData } from '../../utils/authHelper.js';
 
 const auth = new Hono();
 
@@ -49,7 +51,10 @@ auth.post('/login', async (c) => {
         );
       }
 
-      // Generate token
+      // Enforce session limit (cleanup expired and limit to 5 sessions)
+      await Token.enforceSessionLimit(user.id, 5);
+
+      // Generate new token
       const { token, record } = await Token.create(user.id, 'session', 24);
 
       // Return success response
@@ -71,21 +76,16 @@ auth.post('/login', async (c) => {
     }
 });
 
+// Apply auth middleware to all protected routes
+auth.use('/logout', authMiddleware);
+auth.use('/me', authMiddleware);
+
 auth.post('/logout', async (c) => {
     try {
-      const authHeader = c.req.header('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return c.json(
-          apiResponse.unauthorized('No token provided'), 
-          401
-        );
-      }
-
-      const token = authHeader.substring(7);
-      const tokenRecord = await Token.findByToken(token);
-
-      if (tokenRecord) {
-        await tokenRecord.revoke();
+      const { token } = getAuthData(c);
+      
+      if (token) {
+        await token.revoke();
       }
 
       return c.json(
@@ -104,36 +104,12 @@ auth.post('/logout', async (c) => {
 
 auth.get('/me', async (c) => {
     try {
-      const authHeader = c.req.header('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return c.json(
-          apiResponse.unauthorized('No token provided'), 
-          401
-        );
-      }
-
-      const token = authHeader.substring(7);
-      const tokenRecord = await Token.findByToken(token);
-
-      if (!tokenRecord || tokenRecord.isExpired()) {
-        return c.json(
-          apiResponse.unauthorized('Invalid or expired token'), 
-          401
-        );
-      }
-
-      const user = await User.findById(tokenRecord.user_id);
-      if (!user) {
-        return c.json(
-          apiResponse.unauthorized('User not found'), 
-          401
-        );
-      }
+      const { user, token } = getAuthData(c);
 
       return c.json(
         apiResponse.success({
           user: user.toJSON(),
-          token_expires_at: tokenRecord.expires_at
+          token_expires_at: token.expires_at
         }, 'User profile retrieved'), 
         200
       );

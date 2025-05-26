@@ -75,6 +75,39 @@ class Token {
     return tokens.map(token => new Token(token));
   }
 
+  static async findSessionsByUserId(userId) {
+    const tokens = await db(this.tableName)
+      .where('user_id', userId)
+      .where('type', 'session')
+      .where('expires_at', '>', new Date())
+      .orderBy('created_at', 'desc')
+      .select('*');
+    return tokens.map(token => new Token(token));
+  }
+
+  static async cleanupExpiredSessions() {
+    return await db(this.tableName)
+      .where('type', 'session')
+      .where('expires_at', '<', new Date())
+      .del();
+  }
+
+  static async enforceSessionLimit(userId, maxSessions = 5) {
+    // First cleanup expired sessions
+    await this.cleanupExpiredSessions();
+    
+    // Get current active sessions for user
+    const sessions = await this.findSessionsByUserId(userId);
+    
+    // If we have 5 or more sessions, remove the oldest ones
+    if (sessions.length >= maxSessions) {
+      const sessionsToRemove = sessions.slice(maxSessions - 1);
+      for (const session of sessionsToRemove) {
+        await session.revoke();
+      }
+    }
+  }
+
   static async cleanupExpired() {
     return await db(this.tableName)
       .where('expires_at', '<', new Date())
@@ -87,6 +120,26 @@ class Token {
 
   async revokeAllUserTokens() {
     return await db(Token.tableName).where('user_id', this.user_id).del();
+  }
+
+  static async revokeAllUserSessions(userId) {
+    return await db(this.tableName)
+      .where('user_id', userId)
+      .where('type', 'session')
+      .del();
+  }
+
+  async updateExpiry(newExpiresAt) {
+    await db(Token.tableName)
+      .where('id', this.id)
+      .update({
+        expires_at: newExpiresAt,
+        updated_at: new Date()
+      });
+    
+    // Update local instance
+    this.expires_at = newExpiresAt;
+    this.updated_at = new Date();
   }
 
   isExpired() {
