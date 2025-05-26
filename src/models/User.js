@@ -25,6 +25,14 @@ class User {
     return user ? new User(user) : null;
   }
 
+  static async findByIdentity(identity) {
+    const user = await db(this.tableName)
+      .where('email', identity)
+      .orWhere('name', identity)
+      .first();
+    return user ? new User(user) : null;
+  }
+
   static async create(userData) {
     const [id] = await db(this.tableName).insert(userData).returning('id');
     return this.findById(id);
