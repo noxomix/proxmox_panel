@@ -4,25 +4,7 @@ import App from './App.vue'
 import './style.css'
 import api from './utils/api.js'
 import { initDarkMode } from './utils/darkMode.js'
-
-const routes = [
-  { 
-    path: '/', 
-    redirect: '/dashboard'
-  },
-  { 
-    path: '/login', 
-    name: 'Login',
-    component: () => import('./views/Login.vue'),
-    meta: { requiresGuest: true }
-  },
-  { 
-    path: '/dashboard', 
-    name: 'Dashboard',
-    component: () => import('./views/Dashboard.vue'),
-    meta: { requiresAuth: true }
-  }
-]
+import { routes } from './routes.js'
 
 const router = createRouter({
   history: createWebHistory(),

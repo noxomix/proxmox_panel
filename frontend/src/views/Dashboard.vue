@@ -1,51 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-    <!-- Navigation -->
-    <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between h-16">
-          <div class="flex items-center">
-            <h1 class="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Proxmox Panel</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <!-- Dark Mode Toggle -->
-            <DarkModeToggle />
-
-            <!-- User Menu -->
-            <div class="relative">
-              <button
-                @click="showUserMenu = !showUserMenu"
-                class="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-              >
-                <div v-if="!loading" class="w-8 h-8 rounded-full overflow-hidden">
-                  <GorillaAvatarIcon variant="default" />
-                </div>
-                <div v-else class="skeleton-avatar"></div>
-                <span v-if="!loading" class="hidden sm:block">{{ user?.name || 'User' }}</span>
-                <div v-else class="skeleton-text w-20 hidden sm:block"></div>
-                <ChevronDownIcon className="w-4 h-4" />
-              </button>
-
-              <!-- Dropdown Menu -->
-              <div v-if="showUserMenu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-10">
-                <div class="py-1">
-                  <button
-                    @click="handleLogout"
-                    class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    Sign out
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </nav>
-
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+  <div>
       <!-- Welcome Section -->
       <div class="mb-8">
         <h2 v-if="!loading" class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
@@ -164,7 +118,6 @@
           </div>
         </div>
       </div>
-    </main>
   </div>
 </template>
 
@@ -172,31 +125,24 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../utils/api.js'
-import ChevronDownIcon from '../components/icons/ChevronDownIcon.vue'
 import CheckIcon from '../components/icons/CheckIcon.vue'
 import UserIcon from '../components/icons/UserIcon.vue'
 import LockIcon from '../components/icons/LockIcon.vue'
 import CopyIcon from '../components/icons/CopyIcon.vue'
-import GorillaAvatarIcon from '../components/icons/GiraffeAvatarIcon.vue'
-import DarkModeToggle from '../components/DarkModeToggle.vue'
 
 export default {
   name: 'Dashboard',
   components: {
-    ChevronDownIcon,
     CheckIcon,
     UserIcon,
     LockIcon,
-    CopyIcon,
-    GorillaAvatarIcon,
-    DarkModeToggle
+    CopyIcon
   },
   setup() {
     const router = useRouter()
     const user = ref(null)
     const currentToken = ref('')
     const tokenExpiry = ref('')
-    const showUserMenu = ref(false)
     const copied = ref(false)
     const loading = ref(true)
 
@@ -210,8 +156,6 @@ export default {
       // Get current token from localStorage
       currentToken.value = api.getToken()
 
-      // Dark mode is already initialized in main.js
-
       // Fetch user data
       try {
         const response = await api.me()
@@ -224,13 +168,6 @@ export default {
       } finally {
         loading.value = false
       }
-
-      // Close user menu when clicking outside
-      document.addEventListener('click', (e) => {
-        if (!e.target.closest('.relative')) {
-          showUserMenu.value = false
-        }
-      })
     })
 
     const copyToken = async () => {
@@ -247,16 +184,6 @@ export default {
       }
     }
 
-    const handleLogout = async () => {
-      try {
-        await api.logout()
-      } catch (error) {
-        console.error('Logout error:', error)
-      } finally {
-        router.push('/login')
-      }
-    }
-
     const formatDate = (dateString) => {
       if (!dateString) return null
       return new Date(dateString).toLocaleDateString()
@@ -266,11 +193,9 @@ export default {
       user,
       currentToken,
       tokenExpiry,
-      showUserMenu,
       copied,
       loading,
       copyToken,
-      handleLogout,
       formatDate
     }
   }
