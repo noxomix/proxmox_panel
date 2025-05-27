@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import bcrypt from 'bcrypt';
-import db from '../src/db.js';
+import { db } from '../src/db.js';
 import User from '../src/models/User.js';
 import { jwtUtils } from '../src/utils/jwt.js';
 import { apiResponse } from '../src/utils/response.js';
@@ -16,7 +16,7 @@ describe('UserController Logic Tests', () => {
     adminUser = await global.testUtils.createTestUser({
       name: 'Admin User',
       email: 'admin@test.com',
-      role: 'admin',
+      role_id: null, // Will need to be set properly later
       status: 'active'
     });
 
@@ -24,7 +24,7 @@ describe('UserController Logic Tests', () => {
     regularUser = await global.testUtils.createTestUser({
       name: 'Regular User',
       email: 'user@test.com', 
-      role: 'user',
+      role_id: null, // Will need to be set properly later
       status: 'active'
     });
 
@@ -39,7 +39,7 @@ describe('UserController Logic Tests', () => {
         name: 'Test User',
         email: 'test@example.com',
         password_hash: await bcrypt.hash('password123' + (process.env.APPLICATION_SECRET || ''), 12),
-        role: 'user',
+        role_id: null,
         status: 'active'
       };
 

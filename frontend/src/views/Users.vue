@@ -170,7 +170,7 @@
                 {{ user.email }}
               </td>
               <td class="px-4 py-3 whitespace-nowrap">
-                <RoleBadge :role="user.role" />
+                <RoleBadge :role="user.role_name || user.role_display_name ? { name: user.role_name, display_name: user.role_display_name } : null" />
               </td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <StatusBadge :status="user.status" />

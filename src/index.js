@@ -5,6 +5,8 @@ import { logger } from 'hono/logger';
 import { serveStatic } from '@hono/node-server/serve-static';
 import auth from './controllers/auth/AuthController.js';
 import users from './controllers/UserController.js';
+import roles from './controllers/RoleController.js';
+import permissions from './controllers/PermissionController.js';
 
 const app = new Hono();
 
@@ -29,6 +31,10 @@ app.route('/api/auth', auth);
 
 // Mount user management routes
 app.route('/api/users', users);
+
+// Mount role and permission management routes
+app.route('/api/roles', roles);
+app.route('/api/permissions', permissions);
 
 // In production, serve static files
 if (process.env.NODE_ENV === 'production') {

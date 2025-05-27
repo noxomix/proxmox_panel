@@ -20,33 +20,50 @@ export default {
     },
     props: {
         role: {
-            type: String,
-            required: true,
-            validator: (value) => ["user", "admin"].includes(value),
+            type: [String, Object],
+            required: false,
+            default: null,
         },
     },
     computed: {
+        roleName() {
+            if (!this.role) return null;
+            if (typeof this.role === 'string') return this.role;
+            return this.role.name || this.role.role_name;
+        },
+        displayName() {
+            if (!this.role) return 'No Role';
+            if (typeof this.role === 'string') return this.role;
+            return this.role.display_name || this.role.role_display_name || this.role.name || this.role.role_name || 'Unknown Role';
+        },
         roleConfig() {
+            const roleName = this.roleName;
             const configs = {
                 admin: {
-                    text: "Admin",
-                    badgeClass:
-                        "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400",
+                    badgeClass: "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400",
                     iconClass: "w-3.5 h-3.5",
                     icon: "BriefcaseIcon",
                 },
-                user: {
-                    text: "User",
-                    badgeClass:
-                        "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
+                customer: {
+                    badgeClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
                     iconClass: "w-3 h-3",
                     icon: "UserIcon",
                 },
+                user: {
+                    badgeClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
+                    iconClass: "w-3 h-3",
+                    icon: "UserIcon",
+                },
+                default: {
+                    badgeClass: "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400",
+                    iconClass: "w-3 h-3",
+                    icon: "UserIcon",
+                }
             };
-            return configs[this.role] || configs.user;
+            return configs[roleName] || configs.default;
         },
         displayText() {
-            return this.roleConfig.text;
+            return this.displayName;
         },
         badgeClasses() {
             return this.roleConfig.badgeClass;

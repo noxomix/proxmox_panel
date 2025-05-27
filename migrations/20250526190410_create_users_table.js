@@ -8,7 +8,7 @@ export const up = function(knex) {
     table.string('name').notNullable();
     table.string('username').nullable();
     table.string('email').unique().notNullable();
-    table.enum('role', ['user', 'admin']).defaultTo('user');
+    table.uuid('role_id').nullable();
     table.string('password_hash').notNullable();
     table.enum('status', ['active', 'disabled', 'blocked']).defaultTo('active');
     table.timestamps(true, true);

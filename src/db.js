@@ -4,4 +4,5 @@ import knexConfig from '../knexfile.js';
 const environment = process.env.NODE_ENV || 'development';
 const db = knex(knexConfig[environment]);
 
+export { db };
 export default db;

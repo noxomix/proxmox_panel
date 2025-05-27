@@ -183,3 +183,6 @@
 5. **Developer Experience**: Hot reload, clear error messages, good tooling
 
 This schema represents the current state and established patterns for the Proxmox Panel project.
+
+## Commands
+npm run fresh - freshup database and migrate + Seed

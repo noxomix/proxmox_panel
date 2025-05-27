@@ -119,6 +119,26 @@ export const security = {
   },
 
   /**
+   * Validate input based on type
+   */
+  validateInput(input, type) {
+    if (!input || typeof input !== 'string') return false;
+    
+    switch (type) {
+      case 'uuid':
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(input);
+      case 'alphanumeric':
+        return /^[a-zA-Z0-9]+$/.test(input);
+      case 'alphanumeric_underscore':
+        return /^[a-zA-Z0-9_]+$/.test(input);
+      case 'text':
+        return input.length > 0 && input.length <= 255;
+      default:
+        return false;
+    }
+  },
+
+  /**
    * Check if request looks suspicious
    */
   analyzeSuspiciousActivity(c) {

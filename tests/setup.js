@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, beforeEach } from '@jest/globals';
 import dotenv from 'dotenv';
-import db from '../src/db.js';
+import { db } from '../src/db.js';
 
 // Load test environment variables
 dotenv.config({ path: '.env.testing' });
@@ -18,7 +18,11 @@ beforeAll(async () => {
 beforeEach(async () => {
   // Clear all tables in correct order (foreign keys)
   await db('tokens').del();
+  await db('user_permissions').del();
+  await db('role_permissions').del();
   await db('users').del();
+  await db('permissions').del();
+  await db('roles').del();
 });
 
 // Cleanup after all tests
@@ -37,7 +41,7 @@ global.testUtils = {
       username: `testuser_${uniqueId}`,
       email: `test_${uniqueId}@example.com`,
       password_hash: '$2b$10$test.hash.example', // bcrypt hash for 'password123'
-      role: 'user',
+      role_id: null, // No role by default
       status: 'active',
       created_at: new Date(),
       updated_at: new Date(),

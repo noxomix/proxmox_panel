@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import db from '../src/db.js';
+import { db } from '../src/db.js';
 import Token from '../src/models/Token.js';
 
 describe('Token Model - Regenerate with Delete Logic', () => {

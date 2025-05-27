@@ -1,4 +1,4 @@
-import db from '../db.js';
+import { db } from '../db.js';
 
 class User {
   constructor(data) {
@@ -7,7 +7,7 @@ class User {
     this.username = data.username;
     this.email = data.email;
     this.password_hash = data.password_hash;
-    this.role = data.role || 'user';
+    this.role_id = data.role_id;
     this.status = data.status;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
@@ -69,6 +69,106 @@ class User {
     return userWithoutPassword;
   }
 
+  static async getRole(userId) {
+    const result = await db('users')
+      .join('roles', 'users.role_id', 'roles.id')
+      .where('users.id', userId)
+      .select('roles.*')
+      .first();
+    return result;
+  }
+
+  static async getPermissions(userId) {
+    const rolePermissions = await db('permissions')
+      .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
+      .join('users', 'role_permissions.role_id', 'users.role_id')
+      .where('users.id', userId)
+      .select('permissions.*');
+
+    const directPermissions = await db('permissions')
+      .join('user_permissions', 'permissions.id', 'user_permissions.permission_id')
+      .where('user_permissions.user_id', userId)
+      .select('permissions.*');
+
+    const allPermissions = [...rolePermissions, ...directPermissions];
+    const uniquePermissions = allPermissions.reduce((acc, perm) => {
+      if (!acc.find(p => p.id === perm.id)) {
+        acc.push(perm);
+      }
+      return acc;
+    }, []);
+
+    return uniquePermissions;
+  }
+
+  static async hasPermission(userId, permissionName) {
+    const rolePermission = await db('permissions')
+      .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
+      .join('users', 'role_permissions.role_id', 'users.role_id')
+      .where('users.id', userId)
+      .where('permissions.name', permissionName)
+      .first();
+
+    if (rolePermission) return true;
+
+    const directPermission = await db('permissions')
+      .join('user_permissions', 'permissions.id', 'user_permissions.permission_id')
+      .where('user_permissions.user_id', userId)
+      .where('permissions.name', permissionName)
+      .first();
+
+    return !!directPermission;
+  }
+
+  static async assignPermission(userId, permissionId) {
+    try {
+      await db('user_permissions').insert({
+        user_id: userId,
+        permission_id: permissionId
+      });
+      return true;
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  static async removePermission(userId, permissionId) {
+    const deleted = await db('user_permissions')
+      .where({
+        user_id: userId,
+        permission_id: permissionId
+      })
+      .del();
+    return deleted > 0;
+  }
+
+  static async syncPermissions(userId, permissionIds) {
+    await db.transaction(async (trx) => {
+      await trx('user_permissions').where('user_id', userId).del();
+      
+      if (permissionIds.length > 0) {
+        const inserts = permissionIds.map(permissionId => ({
+          user_id: userId,
+          permission_id: permissionId
+        }));
+        await trx('user_permissions').insert(inserts);
+      }
+    });
+  }
+
+  static async assignRole(userId, roleId) {
+    await db('users')
+      .where('id', userId)
+      .update({
+        role_id: roleId,
+        updated_at: new Date()
+      });
+    return this.findById(userId);
+  }
+
   // Update password
   static async updatePassword(userId, hashedPassword) {
     await db('users')
@@ -102,16 +202,19 @@ class User {
   static async paginate({ page = 1, limit = 10, search = '', status = '', sortBy = 'created_at', sortOrder = 'desc' }) {
     const offset = (page - 1) * limit;
     
-    // Build base query
-    let query = db(this.tableName).select('*');
+    // Build base query with role join
+    let query = db(this.tableName)
+      .leftJoin('roles', 'users.role_id', 'roles.id')
+      .select('users.*', 'roles.name as role_name', 'roles.display_name as role_display_name');
+    
     let countQuery = db(this.tableName).count('* as total');
 
     // Add search filters
     if (search) {
       const searchCondition = function() {
-        this.where('name', 'like', `%${search}%`)
-          .orWhere('email', 'like', `%${search}%`)
-          .orWhere('username', 'like', `%${search}%`);
+        this.where('users.name', 'like', `%${search}%`)
+          .orWhere('users.email', 'like', `%${search}%`)
+          .orWhere('users.username', 'like', `%${search}%`);
       };
       query = query.where(searchCondition);
       countQuery = countQuery.where(searchCondition);
@@ -119,7 +222,7 @@ class User {
 
     // Add status filter
     if (status) {
-      query = query.where('status', status);
+      query = query.where('users.status', status);
       countQuery = countQuery.where('status', status);
     }
 
@@ -127,8 +230,9 @@ class User {
     const [{ total }] = await countQuery;
     
     // Add sorting and pagination
+    const orderColumn = sortBy.includes('.') ? sortBy : `users.${sortBy}`;
     query = query
-      .orderBy(sortBy, sortOrder)
+      .orderBy(orderColumn, sortOrder)
       .limit(limit)
       .offset(offset);
 

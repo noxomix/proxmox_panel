@@ -45,10 +45,11 @@
           </SidebarLink>
           
           <SidebarLink 
+            to="/roles" 
             :icon="BriefcaseIcon" 
             :sidebarCollapsed="sidebarCollapsed"
           >
-            Security
+            Roles
           </SidebarLink>
           
           <SidebarLink 

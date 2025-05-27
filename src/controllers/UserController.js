@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import User from '../models/User.js';
 import { apiResponse } from '../utils/response.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { getAuthData } from '../utils/authHelper.js';
 import { security } from '../utils/security.js';
 import { strictRateLimit } from '../middleware/rateLimiter.js';
@@ -16,24 +17,12 @@ users.use('*', authMiddleware);
 users.use('/*/delete', strictRateLimit);
 users.post('/', strictRateLimit); // Only for create operations
 
-/**
- * Middleware to check if user has admin privileges
- */
-const requireAdmin = async (c, next) => {
-  const { user } = getAuthData(c);
-  
-  if (user.role !== 'admin') {
-    return c.json(
-      apiResponse.forbidden('Admin access required'),
-      403
-    );
-  }
-  
-  await next();
-};
-
-// Apply admin check to all user management routes
-users.use('*', requireAdmin);
+// Apply permission checks to specific routes
+users.get('/', requirePermission('user_manage'));
+users.get('/:id', requirePermission('user_manage'));
+users.post('/', requirePermission('user_create'));
+users.put('/:id', requirePermission('user_manage'));
+users.delete('/:id', requirePermission('user_delete'));
 
 /**
  * GET /api/users - List users with pagination and search
@@ -147,7 +136,7 @@ users.get('/:id', async (c) => {
  */
 users.post('/', async (c) => {
   try {
-    const { name, email, password, role = 'user', status = 'active' } = await c.req.json();
+    const { name, email, password, role_id, status = 'active' } = await c.req.json();
 
     // Validate required fields
     const errors = {};
@@ -173,10 +162,13 @@ users.post('/', async (c) => {
       }
     }
 
-    // Validate role
-    const validRoles = ['user', 'admin'];
-    if (role && !validRoles.includes(role)) {
-      errors.role = ['Invalid role. Must be user or admin'];
+    // Validate role_id
+    if (role_id) {
+      const Role = (await import('../models/Role.js')).Role;
+      const roleExists = await Role.findById(role_id);
+      if (!roleExists) {
+        errors.role_id = ['Invalid role ID'];
+      }
     }
 
     // Validate status
@@ -218,7 +210,7 @@ users.post('/', async (c) => {
       name: security.sanitizeInput(name),
       email: security.sanitizeInput(email.toLowerCase()),
       password_hash: hashedPassword,
-      role,
+      role_id,
       status
     };
 
@@ -247,7 +239,7 @@ users.post('/', async (c) => {
 users.put('/:id', async (c) => {
   try {
     const userId = c.req.param('id');
-    const { name, email, role, status, password } = await c.req.json();
+    const { name, email, role_id, status, password } = await c.req.json();
     const { user: currentUser } = getAuthData(c);
 
     if (!userId || typeof userId !== 'string' || userId.length < 10) {
@@ -267,7 +259,7 @@ users.put('/:id', async (c) => {
     }
 
     // Prevent admin from changing their own role/status
-    if (userId === currentUser.id && (role !== undefined || status !== undefined)) {
+    if (userId === currentUser.id && (role_id !== undefined || status !== undefined)) {
       return c.json(
         apiResponse.forbidden('Cannot change your own role or status'),
         403
@@ -308,13 +300,18 @@ users.put('/:id', async (c) => {
       }
     }
 
-    // Validate role if provided
-    if (role !== undefined) {
-      const validRoles = ['user', 'admin'];
-      if (!validRoles.includes(role)) {
-        errors.role = ['Invalid role'];
+    // Validate role_id if provided
+    if (role_id !== undefined) {
+      if (role_id) {
+        const Role = (await import('../models/Role.js')).Role;
+        const roleExists = await Role.findById(role_id);
+        if (!roleExists) {
+          errors.role_id = ['Invalid role ID'];
+        } else {
+          updateData.role_id = role_id;
+        }
       } else {
-        updateData.role = role;
+        updateData.role_id = null;
       }
     }
 

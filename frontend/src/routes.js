@@ -32,6 +32,12 @@ export const routes = [
         component: () => import("./views/Users.vue"),
         meta: { title: "User Management" },
       },
+      {
+        path: "roles",
+        name: "Roles",
+        component: () => import("./views/Roles.vue"),
+        meta: { title: "Role Management" },
+      },
     ],
   },
 ];
