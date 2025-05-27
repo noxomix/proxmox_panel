@@ -6,6 +6,8 @@ import Token from '../../models/Token.js';
 import { apiResponse } from '../../utils/response.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { getAuthData } from '../../utils/authHelper.js';
+import { jwtUtils } from '../../utils/jwt.js';
+import db from '../../db.js';
 
 const auth = new Hono();
 
@@ -52,20 +54,38 @@ auth.post('/login', async (c) => {
         );
       }
 
-      // Enforce session limit (cleanup expired and limit to 5 sessions)
-      await Token.enforceSessionLimit(user.id, 5);
+      // Generate JWT token (new system)
+      const jwtToken = jwtUtils.generateToken(user, 'session');
+      const expiresAt = jwtUtils.getTokenExpiration(jwtToken);
 
-      // Generate new token
+      // Keep session record for management features (hybrid approach)
+      await Token.enforceSessionLimit(user.id, 5);
       const ipAddress = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
       const userAgent = c.req.header('user-agent') || 'unknown';
-      const { token, record } = await Token.create(user.id, 'session', 24, ipAddress, userAgent);
+      
+      // Create session record but store JWT info instead of hash
+      const tokenData = {
+        user_id: user.id,
+        type: 'session',
+        token_hash: null, // No hash needed for JWT
+        jwt_id: jwtUtils.decodeToken(jwtToken).jti,
+        expires_at: expiresAt,
+        ip_address: ipAddress,
+        user_agent: userAgent
+      };
+      
+      await db('tokens').insert({
+        ...tokenData,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
 
-      // Return success response
+      // Return success response with JWT
       return c.json(
         apiResponse.success({
-          token,
+          token: jwtToken, // Return JWT instead of DB token
           user: user.toJSON(),
-          expires_at: record.expires_at
+          expires_at: expiresAt
         }, 'Login successful'), 
         200
       );
@@ -85,10 +105,24 @@ auth.use('/me', authMiddleware);
 
 auth.post('/logout', async (c) => {
     try {
-      const { token } = getAuthData(c);
-      
+      const authHeader = c.req.header('Authorization');
+      const token = authHeader?.substring(7); // Remove 'Bearer ' prefix
+
       if (token) {
-        await token.revoke();
+        // Try to decode JWT to get jwt_id
+        try {
+          const decoded = jwtUtils.decodeToken(token);
+          if (decoded && decoded.jti) {
+            // Find and delete session record by jwt_id
+            await db('tokens').where('jwt_id', decoded.jti).del();
+          }
+        } catch (jwtError) {
+          // If JWT decode fails, try legacy token revocation
+          const { token: tokenRecord } = getAuthData(c);
+          if (tokenRecord && tokenRecord.revoke) {
+            await tokenRecord.revoke();
+          }
+        }
       }
 
       return c.json(

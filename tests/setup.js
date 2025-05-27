@@ -16,7 +16,7 @@ beforeAll(async () => {
 
 // Clean up before each test
 beforeEach(async () => {
-  // Clear all tables
+  // Clear all tables in correct order (foreign keys)
   await db('tokens').del();
   await db('users').del();
 });
