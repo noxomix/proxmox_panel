@@ -7,51 +7,75 @@ import { apiResponse } from '../../utils/response.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { getAuthData } from '../../utils/authHelper.js';
 import { jwtUtils } from '../../utils/jwt.js';
+import { loginRateLimit } from '../../middleware/rateLimiter.js';
+import { security } from '../../utils/security.js';
+import { securityMonitoring } from '../../utils/securityMonitoring.js';
 import db from '../../db.js';
 
 const auth = new Hono();
+
+// Apply rate limiting to login endpoint
+auth.use('/login', loginRateLimit);
 
 auth.post('/login', async (c) => {
     try {
       const { identity, password } = await c.req.json();
 
-      // Validation
-      if (!identity || !password) {
-        return c.json(
-          apiResponse.validation({
-            identity: !identity ? ['Identity is required'] : undefined,
-            password: !password ? ['Password is required'] : undefined
-          }), 
-          422
-        );
+      // Check for suspicious activity
+      const suspiciousCheck = security.analyzeSuspiciousActivity(c);
+      if (suspiciousCheck.isSuspicious) {
+        console.warn(`Suspicious login attempt from ${c.req.header('x-forwarded-for')}: ${suspiciousCheck.reason}`);
+        // Still process but log for monitoring
+      }
+
+      // Validate and sanitize input
+      const validation = security.validateLoginCredentials(identity, password);
+      if (!validation.isValid) {
+        // Add security delay to prevent timing attacks
+        await security.addSecurityDelay();
+        return c.json(apiResponse.validation(validation.errors), 422);
+      }
+
+      // Use sanitized identity
+      const sanitizedIdentity = validation.sanitizedIdentity;
+      
+      // Validate APPLICATION_SECRET exists
+      const pepper = process.env.APPLICATION_SECRET;
+      if (!pepper) {
+        console.error('🔴 SECURITY WARNING: APPLICATION_SECRET not set!');
+        return c.json(apiResponse.error('Server configuration error'), 500);
       }
 
       // Find user by email or name
-      const user = await User.findByIdentity(identity);
+      const user = await User.findByIdentity(sanitizedIdentity);
+      
+      // Always add delay to prevent timing attacks
+      await security.addSecurityDelay();
+      
       if (!user) {
-        return c.json(
-          apiResponse.unauthorized('Invalid credentials'), 
-          401
-        );
+        // Track failed login attempt for security monitoring
+        const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+        const userAgent = c.req.header('user-agent');
+        securityMonitoring.trackFailedAttempt(ip, userAgent, sanitizedIdentity);
+        
+        return c.json(apiResponse.unauthorized('Invalid credentials'), 401);
       }
 
       // Check if user is active
       if (user.status !== 'active') {
-        return c.json(
-          apiResponse.forbidden('Account is not active'), 
-          403
-        );
+        return c.json(apiResponse.unauthorized('Invalid credentials'), 401); // Don't reveal account status
       }
 
-      // Verify password
-      const pepper = process.env.APPLICATION_SECRET || 'fallback-secret';
+      // Verify password with constant-time comparison approach
       const isValidPassword = await bcrypt.compare(password + pepper, user.password_hash);
       
       if (!isValidPassword) {
-        return c.json(
-          apiResponse.unauthorized('Invalid credentials'), 
-          401
-        );
+        // Track failed login attempt for security monitoring
+        const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+        const userAgent = c.req.header('user-agent');
+        securityMonitoring.trackFailedAttempt(ip, userAgent, sanitizedIdentity);
+        
+        return c.json(apiResponse.unauthorized('Invalid credentials'), 401);
       }
 
       // Generate JWT token (new system)
@@ -179,9 +203,11 @@ auth.post('/change-password', async (c) => {
       );
     }
 
-    if (newPassword.length < 6) {
+    // Validate new password strength
+    const passwordValidation = security.validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
       return c.json(
-        apiResponse.error('New password must be at least 6 characters long'),
+        apiResponse.validation({ password: passwordValidation.errors }),
         400
       );
     }
