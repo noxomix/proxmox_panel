@@ -205,7 +205,7 @@ auth.post('/change-password', async (c) => {
       );
     }
 
-    // Validate new password strength
+    // Validate new password strength first
     const passwordValidation = security.validatePassword(newPassword);
     if (!passwordValidation.isValid) {
       return c.json(
@@ -214,8 +214,10 @@ auth.post('/change-password', async (c) => {
       );
     }
 
-    // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+    // Verify current password (with pepper)
+    const pepper = process.env.APPLICATION_SECRET || 'fallback-secret';
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword + pepper, user.password_hash);
+    
     if (!isCurrentPasswordValid) {
       return c.json(
         apiResponse.error('Current password is incorrect'),
@@ -223,9 +225,9 @@ auth.post('/change-password', async (c) => {
       );
     }
 
-    // Hash new password
+    // Hash new password (with pepper)
     const saltRounds = 12;
-    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+    const hashedNewPassword = await bcrypt.hash(newPassword + pepper, saltRounds);
 
     // Update password in database
     await User.updatePassword(user.id, hashedNewPassword);

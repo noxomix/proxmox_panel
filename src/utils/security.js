@@ -38,8 +38,8 @@ export const security = {
   validatePassword(password) {
     const errors = [];
     
-    if (!password || password.length < 3) {
-      errors.push('Password must be at least 3 characters long');
+    if (!password || password.length < 6) {
+      errors.push('Password must be at least 6 characters long');
     }
     
     if (password.length > 128) {
@@ -104,11 +104,11 @@ export const security = {
       }
     }
 
-    // Validate password
+    // Validate password (for login, allow existing shorter passwords)
     if (!password) {
       errors.password = ['Password is required'];
-    } else if (password.length < 3 || password.length > 128) {
-      errors.password = ['Invalid password length'];
+    } else if (password.length > 128) {
+      errors.password = ['Password too long'];
     }
 
     return {
