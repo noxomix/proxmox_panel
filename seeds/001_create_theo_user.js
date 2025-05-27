@@ -20,8 +20,9 @@ export const seed = async function(knex) {
   await knex('users').insert([
     {
       name: 'theo',
+      username: 'theo',
       email: 'theo@example.com',
-      password: hashedPassword,
+      password_hash: hashedPassword,
       status: 'active'
     }
   ]);
