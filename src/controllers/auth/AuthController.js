@@ -43,7 +43,7 @@ auth.post('/login', async (c) => {
 
       // Verify password
       const pepper = process.env.APPLICATION_SECRET || 'fallback-secret';
-      const isValidPassword = await bcrypt.compare(password + pepper, user.password);
+      const isValidPassword = await bcrypt.compare(password + pepper, user.password_hash);
       
       if (!isValidPassword) {
         return c.json(
@@ -153,7 +153,7 @@ auth.post('/change-password', async (c) => {
     }
 
     // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
     if (!isCurrentPasswordValid) {
       return c.json(
         apiResponse.error('Current password is incorrect'),

@@ -4,8 +4,9 @@ class User {
   constructor(data) {
     this.id = data.id;
     this.name = data.name;
+    this.username = data.username;
     this.email = data.email;
-    this.password = data.password;
+    this.password_hash = data.password_hash;
     this.status = data.status;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
@@ -28,7 +29,7 @@ class User {
   static async findByIdentity(identity) {
     const user = await db(this.tableName)
       .where('email', identity)
-      .orWhere('name', identity)
+      .orWhere('username', identity)
       .first();
     return user ? new User(user) : null;
   }
@@ -60,7 +61,7 @@ class User {
   }
 
   toJSON() {
-    const { password, ...userWithoutPassword } = this;
+    const { password_hash, ...userWithoutPassword } = this;
     return userWithoutPassword;
   }
 
@@ -69,7 +70,7 @@ class User {
     await db('users')
       .where('id', userId)
       .update({
-        password: hashedPassword,
+        password_hash: hashedPassword,
         updated_at: new Date()
       });
     
