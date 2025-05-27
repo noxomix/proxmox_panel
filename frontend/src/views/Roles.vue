@@ -1,13 +1,7 @@
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex justify-between items-center">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Role Management</h1>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Manage user roles and permissions
-        </p>
-      </div>
+    <div class="flex justify-end items-center">
       <CreateButton @click="showCreateRole = true">
         Create Role
       </CreateButton>
@@ -44,7 +38,7 @@
 
       <template #body>
         <tr v-for="role in roles" :key="role.id" 
-            class="odd:bg-gray-50 odd:dark:bg-gray-700 even:bg-white even:dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
+            class="odd:bg-gray-50 odd:dark:bg-gray-700 even:bg-white even:dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-600">
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center">
               <BriefcaseIcon class="w-5 h-5 text-gray-400 mr-3" />

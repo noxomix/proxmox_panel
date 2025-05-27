@@ -1,14 +1,7 @@
 <template>
   <div class="space-y-6">
     <!-- Header with Controls -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Manage user accounts and permissions
-        </p>
-      </div>
-      
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
       <!-- Controls: Search, Filter, Create Button -->
       <div class="flex flex-col sm:flex-row gap-3">
         <!-- Search Input with Icon -->
@@ -144,11 +137,17 @@
         <tr 
           v-for="(user, index) in users" 
           :key="user.id"
-          class="odd:bg-gray-50 odd:dark:bg-gray-700 even:bg-white even:dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+          class="odd:bg-gray-50 odd:dark:bg-gray-700 even:bg-white even:dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-600"
         >
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="flex items-center">
-              <UserIcon :className="'w-8 h-8 text-gray-400 dark:text-gray-500 mr-3'" />
+              <div class="mr-3">
+                <Avatar 
+                  :imageUrl="getAvatarImage(user.username || '')"
+                  size="md"
+                  :alt="`${user.name} Avatar`"
+                />
+              </div>
               <div>
                 <div class="text-sm font-medium text-gray-900 dark:text-white">
                   {{ user.name }}
@@ -238,6 +237,8 @@ import ActionButton from '../components/ActionButton.vue';
 import BaseTable from '../components/BaseTable.vue';
 import ChevronDownIcon from '../components/icons/ChevronDownIcon.vue';
 import CreateButton from '../components/CreateButton.vue';
+import Avatar from '../components/Avatar.vue';
+import { getAvatarImage } from '../utils/avatarHelper.js';
 
 export default {
   name: 'Users',
@@ -253,7 +254,8 @@ export default {
     TablePagination,
     BaseTable,
     ChevronDownIcon,
-    CreateButton
+    CreateButton,
+    Avatar
   },
   setup() {
     const users = ref([]);
@@ -461,7 +463,8 @@ export default {
       clearFilters,
       editUser,
       deleteUser,
-      impersonateUser
+      impersonateUser,
+      getAvatarImage
     };
   }
 };

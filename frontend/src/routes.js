@@ -24,19 +24,28 @@ export const routes = [
         path: "profile",
         name: "Profile",
         component: () => import("./views/Profile.vue"),
-        meta: { title: "Profile Settings" },
+        meta: { 
+          title: "Profile Settings",
+          subtitle: "Manage your account settings and API keys"
+        },
       },
       {
         path: "users",
         name: "Users",
         component: () => import("./views/Users.vue"),
-        meta: { title: "User Management" },
+        meta: { 
+          title: "User Management",
+          subtitle: "Manage user accounts and permissions"
+        },
       },
       {
         path: "roles",
         name: "Roles",
         component: () => import("./views/Roles.vue"),
-        meta: { title: "Role Management" },
+        meta: { 
+          title: "Role Management",
+          subtitle: "Manage user roles and permissions"
+        },
       },
     ],
   },

@@ -1,10 +1,5 @@
 <template>
   <div class="max-w-4xl mx-auto space-y-8">
-    <!-- Page Header -->
-    <div class="border-b border-gray-200 dark:border-gray-700 pb-6">
-      <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Profile & API</h1>
-      <p class="text-gray-600 dark:text-gray-400 mt-2">Manage your account settings and API access</p>
-    </div>
 
     <!-- Password Change Section -->
     <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
