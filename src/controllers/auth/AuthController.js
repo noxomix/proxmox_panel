@@ -191,6 +191,9 @@ auth.post('/generate-api-token', async (c) => {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + (365 * 24 * 60 * 60 * 1000)); // 365 days
 
+    // Delete existing API tokens for this user
+    await Token.deleteApiTokensByUserId(user.id);
+
     // Create API token
     const tokenPayload = {
       id: user.id,

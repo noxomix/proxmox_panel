@@ -32,56 +32,25 @@
                 <!-- Form -->
                 <form @submit.prevent="handleLogin" class="space-y-6">
                     <!-- Identity Field -->
-                    <div>
-                        <label
-                            for="identity"
-                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                        >
-                            Email or Username
-                        </label>
-                        <input
-                            id="identity"
-                            v-model="form.identity"
-                            type="text"
-                            required
-                            class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                            placeholder="Enter your email or username"
-                            :disabled="loading"
-                        />
-                    </div>
+                    <BaseInput
+                        id="identity"
+                        v-model="form.identity"
+                        label="Email or Username"
+                        type="text"
+                        placeholder="Enter your email or username"
+                        required
+                        :disabled="loading"
+                    />
 
                     <!-- Password Field -->
-                    <div>
-                        <label
-                            for="password"
-                            class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                        >
-                            Password
-                        </label>
-                        <div class="relative">
-                            <input
-                                id="password"
-                                v-model="form.password"
-                                :type="showPassword ? 'text' : 'password'"
-                                required
-                                class="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                                placeholder="Enter your password"
-                                :disabled="loading"
-                            />
-                            <button
-                                type="button"
-                                @click="showPassword = !showPassword"
-                                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                                :disabled="loading"
-                            >
-                                <EyeIcon
-                                    v-if="showPassword"
-                                    className="w-5 h-5"
-                                />
-                                <EyeSlashIcon v-else className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
+                    <PasswordInput
+                        id="password"
+                        v-model="form.password"
+                        label="Password"
+                        placeholder="Enter your password"
+                        required
+                        :disabled="loading"
+                    />
 
                     <!-- Error Message -->
                     <div
@@ -125,8 +94,8 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import api from "../utils/api.js";
-import EyeIcon from "../components/icons/EyeIcon.vue";
-import EyeSlashIcon from "../components/icons/EyeSlashIcon.vue";
+import BaseInput from "../components/BaseInput.vue";
+import PasswordInput from "../components/PasswordInput.vue";
 import SpinnerIcon from "../components/icons/SpinnerIcon.vue";
 import DarkModeToggle from "../components/DarkModeToggle.vue";
 import AppLogo from "../components/AppLogo.vue";
@@ -134,8 +103,8 @@ import AppLogo from "../components/AppLogo.vue";
 export default {
     name: "Login",
     components: {
-        EyeIcon,
-        EyeSlashIcon,
+        BaseInput,
+        PasswordInput,
         SpinnerIcon,
         DarkModeToggle,
         AppLogo,
@@ -144,7 +113,6 @@ export default {
         const router = useRouter();
         const loading = ref(false);
         const error = ref("");
-        const showPassword = ref(false);
 
         const form = ref({
             identity: "",
@@ -186,7 +154,6 @@ export default {
             form,
             loading,
             error,
-            showPassword,
             handleLogin,
         };
     },

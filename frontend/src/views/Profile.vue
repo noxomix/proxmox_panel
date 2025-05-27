@@ -12,85 +12,34 @@
       
       <form @submit.prevent="changePassword" class="space-y-4">
         <!-- Current Password -->
-        <div>
-          <label for="currentPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Current Password
-          </label>
-          <div class="relative">
-            <input
-              id="currentPassword"
-              v-model="passwordForm.currentPassword"
-              :type="showCurrentPassword ? 'text' : 'password'"
-              required
-              class="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              placeholder="Enter your current password"
-              :disabled="passwordLoading"
-            />
-            <button
-              type="button"
-              @click="showCurrentPassword = !showCurrentPassword"
-              class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              :disabled="passwordLoading"
-            >
-              <EyeIcon v-if="showCurrentPassword" className="w-5 h-5" />
-              <EyeSlashIcon v-else className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+        <PasswordInput
+          id="currentPassword"
+          v-model="passwordForm.currentPassword"
+          label="Current Password"
+          placeholder="Enter your current password"
+          required
+          :disabled="passwordLoading"
+        />
 
         <!-- New Password -->
-        <div>
-          <label for="newPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            New Password
-          </label>
-          <div class="relative">
-            <input
-              id="newPassword"
-              v-model="passwordForm.newPassword"
-              :type="showNewPassword ? 'text' : 'password'"
-              required
-              class="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              placeholder="Enter your new password"
-              :disabled="passwordLoading"
-            />
-            <button
-              type="button"
-              @click="showNewPassword = !showNewPassword"
-              class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              :disabled="passwordLoading"
-            >
-              <EyeIcon v-if="showNewPassword" className="w-5 h-5" />
-              <EyeSlashIcon v-else className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+        <PasswordInput
+          id="newPassword"
+          v-model="passwordForm.newPassword"
+          label="New Password"
+          placeholder="Enter your new password"
+          required
+          :disabled="passwordLoading"
+        />
 
         <!-- Confirm Password -->
-        <div>
-          <label for="confirmPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Confirm New Password
-          </label>
-          <div class="relative">
-            <input
-              id="confirmPassword"
-              v-model="passwordForm.confirmPassword"
-              :type="showConfirmPassword ? 'text' : 'password'"
-              required
-              class="w-full px-4 py-3 pr-12 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              placeholder="Confirm your new password"
-              :disabled="passwordLoading"
-            />
-            <button
-              type="button"
-              @click="showConfirmPassword = !showConfirmPassword"
-              class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              :disabled="passwordLoading"
-            >
-              <EyeIcon v-if="showConfirmPassword" className="w-5 h-5" />
-              <EyeSlashIcon v-else className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+        <PasswordInput
+          id="confirmPassword"
+          v-model="passwordForm.confirmPassword"
+          label="Confirm New Password"
+          placeholder="Confirm your new password"
+          required
+          :disabled="passwordLoading"
+        />
 
         <!-- Password Error -->
         <div v-if="passwordError" class="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
@@ -112,7 +61,10 @@
             <SpinnerIcon />
             Changing Password...
           </span>
-          <span v-else>Change Password</span>
+          <span v-else class="flex items-center">
+            <CheckIcon className="w-4 h-4 mr-2" />
+            Change Password
+          </span>
         </button>
       </form>
     </div>
@@ -124,13 +76,17 @@
         <button
           @click="generateApiToken"
           :disabled="tokenLoading"
-          class="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-all text-sm"
+          :class="currentApiToken ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'"
+          class="disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-all text-sm"
         >
           <span v-if="tokenLoading" class="flex items-center">
             <SpinnerIcon />
             Generating...
           </span>
-          <span v-else>Generate New Token</span>
+          <span v-else class="flex items-center">
+            <RefreshIcon v-if="currentApiToken" className="w-4 h-4 mr-2" />
+            {{ currentApiToken ? 'Regenerate Token' : 'Generate New Token' }}
+          </span>
         </button>
       </div>
 
@@ -234,17 +190,19 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../utils/api.js'
-import EyeIcon from '../components/icons/EyeIcon.vue'
-import EyeSlashIcon from '../components/icons/EyeSlashIcon.vue'
+import PasswordInput from '../components/PasswordInput.vue'
 import SpinnerIcon from '../components/icons/SpinnerIcon.vue'
+import CheckIcon from '../components/icons/CheckIcon.vue'
+import RefreshIcon from '../components/icons/RefreshIcon.vue'
 import CopyButton from '../components/CopyButton.vue'
 
 export default {
   name: 'Profile',
   components: {
-    EyeIcon,
-    EyeSlashIcon,
+    PasswordInput,
     SpinnerIcon,
+    CheckIcon,
+    RefreshIcon,
     CopyButton
   },
   setup() {
@@ -256,9 +214,6 @@ export default {
       newPassword: '',
       confirmPassword: ''
     })
-    const showCurrentPassword = ref(false)
-    const showNewPassword = ref(false)
-    const showConfirmPassword = ref(false)
     const passwordLoading = ref(false)
     const passwordError = ref('')
     const passwordSuccess = ref('')
@@ -410,9 +365,6 @@ export default {
 
     return {
       passwordForm,
-      showCurrentPassword,
-      showNewPassword,
-      showConfirmPassword,
       passwordLoading,
       passwordError,
       passwordSuccess,

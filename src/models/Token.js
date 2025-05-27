@@ -219,6 +219,14 @@ class Token {
     return token ? new Token(token) : null;
   }
 
+  // Delete all API tokens for a user
+  static async deleteApiTokensByUserId(userId) {
+    return await db(this.tableName)
+      .where('user_id', userId)
+      .where('type', 'api')
+      .del();
+  }
+
   // Get active sessions for user
   static async getActiveSessions(userId) {
     const sessions = await db(this.tableName)
