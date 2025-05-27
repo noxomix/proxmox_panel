@@ -11,7 +11,8 @@
       "Bash(npm run migrate:*)",
       "Bash(npm test:*)",
       "Bash(NODE_ENV=test npm run migrate:rollback)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

@@ -217,7 +217,7 @@ class Token {
       .where('type', 'session')
       .where('expires_at', '>', new Date())
       .orderBy('updated_at', 'desc')
-      .select('id', 'created_at', 'updated_at', 'expires_at', 'ip_address', 'user_agent');
+      .select('id', 'jwt_id', 'created_at', 'updated_at', 'expires_at', 'ip_address', 'user_agent');
     
     return sessions;
   }

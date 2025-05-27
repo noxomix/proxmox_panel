@@ -126,16 +126,13 @@
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Active Sessions</h2>
         <div class="flex items-center space-x-3">
-          <RippleEffect :disabled="sessionsLoading || sessions.length <= 1" color="rgba(234, 88, 12, 0.3)" v-slot="{ createRipple }">
-            <button
-              @click="(e) => { createRipple(e); revokeAllSessions(); }"
-              @touchstart="createRipple"
-              :disabled="sessionsLoading || sessions.length <= 1"
-              class="text-xs px-3 py-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Sign out all other devices
-            </button>
-          </RippleEffect>
+          <PrimaryButton
+            variant="warning"
+            text="Sign out all other devices"
+            icon="LogoutIcon"
+            :disabled="sessionsLoading || sessions.length <= 1"
+            @click="revokeAllSessions"
+          />
           <RippleEffect :disabled="sessionsLoading" color="rgba(37, 99, 235, 0.3)" v-slot="{ createRipple }">
             <button
               @click="(e) => { createRipple(e); loadSessions(); }"
@@ -162,29 +159,38 @@
           class="border border-gray-200 dark:border-gray-700 rounded-lg p-4 flex items-center justify-between"
         >
           <div class="flex-1">
-            <div class="flex items-center space-x-2 mb-1">
+            <div class="mb-1">
               <span class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ session.user_agent || 'Unknown Browser' }}
               </span>
-              <span v-if="session.is_current" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center space-x-2">
+              <span>
+                IP: {{ session.ip_address || 'Unknown' }} • 
+                Last active: {{ formatDate(session.updated_at) }} •
+                Expires: {{ formatDate(session.expires_at) }}
+              </span>
+              <span v-if="session.is_current" class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400 whitespace-nowrap flex-shrink-0">
                 Current Session
               </span>
-            </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
-              IP: {{ session.ip_address || 'Unknown' }} • 
-              Last active: {{ formatDate(session.updated_at) }} •
-              Expires: {{ formatDate(session.expires_at) }}
             </p>
           </div>
-          <RippleEffect color="rgba(220, 38, 38, 0.3)" v-slot="{ createRipple }">
-            <button
-              @click="(e) => { createRipple(e); session.is_current ? handleCurrentSessionLogout() : revokeSession(session.id); }"
-              @touchstart="createRipple"
-              class="ml-4 text-xs px-2 py-1 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
-            >
-              Sign out{{ session.is_current ? ' (current)' : '' }}
-            </button>
-          </RippleEffect>
+          <div v-if="session.is_current" class="flex-shrink-0">
+            <ActionButton
+              variant="danger"
+              title="Sign out (current session)"
+              icon="LogoutIcon"
+              @click="handleCurrentSessionLogout"
+            />
+          </div>
+          <div v-else class="flex-shrink-0">
+            <ActionButton
+              variant="danger"
+              title="Sign out session"
+              icon="LogoutIcon"
+              @click="revokeSession(session.id)"
+            />
+          </div>
         </div>
       </div>
 
@@ -212,6 +218,8 @@ import CheckIcon from '../components/icons/CheckIcon.vue'
 import RefreshIcon from '../components/icons/RefreshIcon.vue'
 import CopyButton from '../components/CopyButton.vue'
 import RippleEffect from '../components/RippleEffect.vue'
+import ActionButton from '../components/ActionButton.vue'
+import PrimaryButton from '../components/PrimaryButton.vue'
 
 export default {
   name: 'Profile',
@@ -221,7 +229,9 @@ export default {
     CheckIcon,
     RefreshIcon,
     CopyButton,
-    RippleEffect
+    RippleEffect,
+    ActionButton,
+    PrimaryButton
   },
   setup() {
     const router = useRouter()
@@ -347,6 +357,7 @@ export default {
       try {
         const response = await api.revokeSession(sessionId)
         if (response.success) {
+          // Remove the session from UI immediately
           sessions.value = sessions.value.filter(s => s.id !== sessionId)
         }
       } catch (error) {
@@ -358,7 +369,7 @@ export default {
       try {
         const response = await api.revokeAllSessions()
         if (response.success) {
-          // Keep only current session
+          // Remove all other sessions from UI, keep only current session
           sessions.value = sessions.value.filter(s => s.is_current)
         }
       } catch (error) {

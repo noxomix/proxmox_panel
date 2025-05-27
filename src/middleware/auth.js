@@ -1,3 +1,4 @@
+import db from '../db.js';
 import Token from '../models/Token.js';
 import User from '../models/User.js';
 import { jwtUtils } from '../utils/jwt.js';
@@ -16,6 +17,18 @@ export async function authMiddleware(c, next) {
     // Try JWT verification first (new system)
     try {
       const payload = jwtUtils.verifyToken(token);
+      
+      // Check if session is revoked by looking up jwt_id in database
+      const sessionRecord = await db('tokens')
+        .where('jwt_id', payload.jti)
+        .where('type', 'session')
+        .where('expires_at', '>', new Date())
+        .first();
+
+      // If no session record found, the session has been revoked
+      if (!sessionRecord) {
+        return c.json(apiResponse.unauthorized('Session has been revoked'), 401);
+      }
       
       // JWT verification successful - get user from payload
       const user = await User.findById(payload.id);

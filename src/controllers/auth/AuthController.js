@@ -17,6 +17,9 @@ const auth = new Hono();
 // Apply rate limiting to login endpoint
 auth.use('/login', loginRateLimit);
 
+// Apply auth middleware to protected routes
+auth.use('/token', authMiddleware);
+
 auth.post('/login', async (c) => {
     try {
       const { identity, password } = await c.req.json();
@@ -324,17 +327,31 @@ auth.get('/api-token', async (c) => {
 });
 
 // Get active sessions
-auth.get('/sessions', async (c) => {
+auth.get('/sessions', authMiddleware, async (c) => {
   try {
     const { user, token } = getAuthData(c);
+
+    // Get JWT from Authorization header to extract jti
+    const authHeader = c.req.header('Authorization');
+    const jwtToken = authHeader?.substring(7); // Remove 'Bearer ' prefix
+    let currentJwtId = null;
+    
+    if (jwtToken) {
+      try {
+        const decoded = jwtUtils.decodeToken(jwtToken);
+        currentJwtId = decoded.jti;
+      } catch (error) {
+        console.error('JWT decode error:', error);
+      }
+    }
 
     // Get all active sessions for user
     const sessions = await Token.getActiveSessions(user.id);
 
-    // Mark current session
+    // Mark current session - compare with JWT ID 
     const sessionsWithCurrent = sessions.map(session => ({
       ...session,
-      is_current: session.id === token.id
+      is_current: session.jwt_id === currentJwtId
     }));
 
     return c.json(
@@ -351,10 +368,32 @@ auth.get('/sessions', async (c) => {
 });
 
 // Revoke session
-auth.delete('/sessions/:sessionId', async (c) => {
+auth.delete('/sessions/:sessionId', authMiddleware, async (c) => {
   try {
     const sessionId = c.req.param('sessionId');
     const { user, token } = getAuthData(c);
+
+    // Check if user exists
+    if (!user || !user.id) {
+      return c.json(
+        apiResponse.error('Authentication required'),
+        401
+      );
+    }
+
+    // Get JWT from Authorization header to extract jti
+    const authHeader = c.req.header('Authorization');
+    const jwtToken = authHeader?.substring(7); // Remove 'Bearer ' prefix
+    let currentJwtId = null;
+    
+    if (jwtToken) {
+      try {
+        const decoded = jwtUtils.decodeToken(jwtToken);
+        currentJwtId = decoded.jti;
+      } catch (error) {
+        console.error('JWT decode error in revoke:', error);
+      }
+    }
 
     // Check if session belongs to user
     const session = await Token.findById(sessionId);
@@ -367,7 +406,7 @@ auth.delete('/sessions/:sessionId', async (c) => {
     }
 
     // Don't allow revoking current session
-    if (session.id === token.id) {
+    if (session.jwt_id === currentJwtId) {
       return c.json(
         apiResponse.error('Cannot revoke current session'),
         400
@@ -394,12 +433,30 @@ auth.delete('/sessions/:sessionId', async (c) => {
 });
 
 // Revoke all other sessions
-auth.delete('/sessions/all', async (c) => {
+auth.delete('/sessions', authMiddleware, async (c) => {
   try {
     const { user, token } = getAuthData(c);
 
-    // Revoke all sessions except current one
-    await Token.revokeAllUserSessionsExceptCurrent(user.id, token.id);
+    // Get JWT from Authorization header to extract jti
+    const authHeader = c.req.header('Authorization');
+    const jwtToken = authHeader?.substring(7); // Remove 'Bearer ' prefix
+    let currentJwtId = null;
+    
+    if (jwtToken) {
+      try {
+        const decoded = jwtUtils.decodeToken(jwtToken);
+        currentJwtId = decoded.jti;
+      } catch (error) {
+        console.error('JWT decode error in revoke all:', error);
+      }
+    }
+
+    // Revoke all sessions except current one - use JWT ID
+    const deletedCount = await db('tokens')
+      .where('user_id', user.id)
+      .where('type', 'session')
+      .whereNot('jwt_id', currentJwtId)
+      .del();
 
     return c.json(
       apiResponse.success(

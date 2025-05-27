@@ -150,7 +150,7 @@ class ApiClient {
 
   // Revoke all other sessions
   async revokeAllSessions() {
-    return this.delete('/auth/sessions/all');
+    return this.delete('/auth/sessions');
   }
 
   // Check if user is authenticated

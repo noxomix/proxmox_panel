@@ -21,6 +21,7 @@ import RippleEffect from './RippleEffect.vue';
 import EditIcon from './icons/EditIcon.vue';
 import DeleteIcon from './icons/DeleteIcon.vue';
 import ImpersonateIcon from './icons/ImpersonateIcon.vue';
+import LogoutIcon from './icons/LogoutIcon.vue';
 
 export default {
   name: 'ActionButton',
@@ -28,13 +29,14 @@ export default {
     RippleEffect,
     EditIcon,
     DeleteIcon,
-    ImpersonateIcon
+    ImpersonateIcon,
+    LogoutIcon
   },
   props: {
     variant: {
       type: String,
       required: true,
-      validator: (value) => ['edit', 'delete', 'impersonate'].includes(value)
+      validator: (value) => ['edit', 'delete', 'impersonate', 'danger', 'warning'].includes(value)
     },
     title: {
       type: String,
@@ -51,7 +53,9 @@ export default {
       const variants = {
         edit: 'bg-blue-100 text-blue-600 border-blue-300 hover:bg-blue-200 hover:border-blue-400 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/30',
         delete: 'bg-red-100 text-red-600 border-red-300 hover:bg-red-200 hover:border-red-400 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/30',
-        impersonate: 'bg-green-100 text-green-600 border-green-300 hover:bg-green-200 hover:border-green-400 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/30'
+        danger: 'bg-red-100 text-red-600 border-red-300 hover:bg-red-200 hover:border-red-400 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/30',
+        impersonate: 'bg-green-100 text-green-600 border-green-300 hover:bg-green-200 hover:border-green-400 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/30',
+        warning: 'bg-orange-100 text-orange-600 border-orange-300 hover:bg-orange-200 hover:border-orange-400 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800 dark:hover:bg-orange-900/30'
       };
       return variants[this.variant] || variants.edit;
     },
@@ -59,7 +63,9 @@ export default {
       const colors = {
         edit: 'rgba(59, 130, 246, 0.3)',     // blue-500 with opacity
         delete: 'rgba(239, 68, 68, 0.3)',   // red-500 with opacity  
-        impersonate: 'rgba(34, 197, 94, 0.3)' // green-500 with opacity
+        danger: 'rgba(239, 68, 68, 0.3)',   // red-500 with opacity  
+        impersonate: 'rgba(34, 197, 94, 0.3)', // green-500 with opacity
+        warning: 'rgba(249, 115, 22, 0.3)'  // orange-500 with opacity
       };
       return colors[this.variant] || colors.edit;
     }
