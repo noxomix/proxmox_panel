@@ -63,6 +63,11 @@ export default {
       // Create ripple element
       const ripple = document.createElement('div')
       ripple.className = 'ripple-wave'
+      
+      // Get the computed border-radius of the container
+      const computedStyle = window.getComputedStyle(container)
+      const borderRadius = computedStyle.borderRadius || '0px'
+      
       ripple.style.cssText = `
         position: absolute;
         border-radius: 50%;
@@ -124,16 +129,36 @@ export default {
             position: relative;
             overflow: hidden;
             isolation: isolate;
+            display: inline-block;
+          }
+          
+          .ripple-container > * {
+            position: relative;
+            z-index: 1;
+            display: block;
           }
           
           .ripple-wave {
             position: absolute;
             border-radius: 50%;
             pointer-events: none;
-            z-index: 1000;
+            z-index: 0;
           }
         `
         document.head.appendChild(style)
+      }
+      
+      // Copy border-radius from the button to the container
+      const container = rippleContainer.value
+      if (container) {
+        const firstChild = container.children[0]
+        if (firstChild) {
+          const computedStyle = window.getComputedStyle(firstChild)
+          const borderRadius = computedStyle.borderRadius
+          if (borderRadius && borderRadius !== '0px') {
+            container.style.borderRadius = borderRadius
+          }
+        }
       }
     })
 
@@ -154,5 +179,12 @@ export default {
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  display: inline-block;
+}
+
+.ripple-container > :deep(*) {
+  position: relative;
+  z-index: 1;
+  display: block;
 }
 </style>
