@@ -8,6 +8,7 @@ export const up = function(knex) {
     table.uuid('user_id').notNullable();
     table.string('token_hash').nullable().unique(); // For session tokens (hashed)
     table.text('token').nullable(); // For API tokens (plain text)
+    table.string('jwt_id').nullable(); // For JWT session tracking
     table.string('type').defaultTo('session'); // session, api, etc.
     table.string('ip_address').nullable();
     table.text('user_agent').nullable();
@@ -18,6 +19,7 @@ export const up = function(knex) {
     table.index(['token_hash']);
     table.index(['user_id']);
     table.index(['expires_at']);
+    table.index(['jwt_id']);
   });
 };
 
