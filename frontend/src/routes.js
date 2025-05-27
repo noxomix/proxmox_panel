@@ -26,6 +26,12 @@ export const routes = [
         component: () => import("./views/Profile.vue"),
         meta: { title: "Profile Settings" },
       },
+      {
+        path: "users",
+        name: "Users",
+        component: () => import("./views/Users.vue"),
+        meta: { title: "User Management" },
+      },
     ],
   },
 ];

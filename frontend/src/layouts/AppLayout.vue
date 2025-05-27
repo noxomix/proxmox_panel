@@ -37,6 +37,14 @@
           </SidebarLink>
           
           <SidebarLink 
+            to="/users" 
+            :icon="UsersIcon" 
+            :sidebarCollapsed="sidebarCollapsed"
+          >
+            Users
+          </SidebarLink>
+          
+          <SidebarLink 
             :icon="ShieldIcon" 
             :sidebarCollapsed="sidebarCollapsed"
           >
@@ -160,6 +168,7 @@ import SidebarToggle from '../components/SidebarToggle.vue'
 import SidebarLink from '../components/SidebarLink.vue'
 import LogoutIcon from '../components/icons/LogoutIcon.vue'
 import DashboardIcon from '../components/icons/DashboardIcon.vue'
+import UsersIcon from '../components/icons/UsersIcon.vue'
 import UserSettingsIcon from '../components/icons/UserSettingsIcon.vue'
 import RippleEffect from '../components/RippleEffect.vue'
 
@@ -177,6 +186,7 @@ export default {
     SidebarLink,
     LogoutIcon,
     DashboardIcon,
+    UsersIcon,
     UserSettingsIcon,
     RippleEffect
   },
@@ -258,7 +268,8 @@ export default {
       UserIcon,
       ShieldIcon,
       LockIcon,
-      DashboardIcon
+      DashboardIcon,
+      UsersIcon
     }
   }
 }

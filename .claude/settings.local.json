@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(NODE_ENV=test npx knex migrate:latest)",
+      "Bash(node fix_migrations.js)",
+      "Bash(npm run migrate:*)"
     ],
     "deny": []
   }

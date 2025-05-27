@@ -22,6 +22,7 @@ export const seed = async function(knex) {
       name: 'theo',
       username: 'theo',
       email: 'theo@example.com',
+      role: 'admin',
       password_hash: hashedPassword,
       status: 'active'
     }

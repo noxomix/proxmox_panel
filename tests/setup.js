@@ -37,14 +37,16 @@ global.testUtils = {
       username: `testuser_${uniqueId}`,
       email: `test_${uniqueId}@example.com`,
       password_hash: '$2b$10$test.hash.example', // bcrypt hash for 'password123'
+      role: 'user',
+      status: 'active',
       created_at: new Date(),
       updated_at: new Date(),
       ...overrides
     };
     
-    await db('users').insert(userData);
+    const [userId] = await db('users').insert(userData);
     
-    // Get the created user by email since MySQL with UUID doesn't return the ID
+    // Get the created user by email (safer with UUID)
     const createdUser = await db('users').where('email', userData.email).first();
     return createdUser;
   },

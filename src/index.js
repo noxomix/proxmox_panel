@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serveStatic } from '@hono/node-server/serve-static';
 import auth from './controllers/auth/AuthController.js';
+import users from './controllers/UserController.js';
 
 const app = new Hono();
 
@@ -25,6 +26,9 @@ app.get('/api/health', (c) => {
 
 // Mount auth routes
 app.route('/api/auth', auth);
+
+// Mount user management routes
+app.route('/api/users', users);
 
 // In production, serve static files
 if (process.env.NODE_ENV === 'production') {
