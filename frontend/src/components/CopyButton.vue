@@ -1,21 +1,25 @@
 <template>
-  <button
-    @click="handleCopy"
-    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
-  >
-    <CopyIcon className="w-4 h-4 mr-1" />
-    {{ copied ? 'Copied!' : 'Copy' }}
-  </button>
+  <RippleEffect color="rgba(37, 99, 235, 0.3)">
+    <button
+      @click="handleCopy"
+      class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
+    >
+      <CopyIcon className="w-4 h-4 mr-1" />
+      {{ copied ? 'Copied!' : 'Copy' }}
+    </button>
+  </RippleEffect>
 </template>
 
 <script>
 import { ref } from 'vue'
 import CopyIcon from './icons/CopyIcon.vue'
+import RippleEffect from './RippleEffect.vue'
 
 export default {
   name: 'CopyButton',
   components: {
-    CopyIcon
+    CopyIcon,
+    RippleEffect
   },
   props: {
     text: {

@@ -61,12 +61,14 @@
           <div class="flex justify-between h-16">
             <div class="flex items-center">
               <!-- Mobile menu button -->
-              <button
-                @click="sidebarCollapsed = !sidebarCollapsed"
-                class="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mr-3"
-              >
-                <ChevronDownIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
+              <RippleEffect color="rgba(107, 114, 128, 0.3)">
+                <button
+                  @click="sidebarCollapsed = !sidebarCollapsed"
+                  class="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mr-3"
+                >
+                  <ChevronDownIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                </button>
+              </RippleEffect>
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                 {{ pageTitle }}
               </h2>
@@ -78,18 +80,20 @@
 
               <!-- User Menu -->
               <div class="relative">
-                <button
-                  @click="showUserMenu = !showUserMenu"
-                  class="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                >
-                  <div v-if="!loading" class="w-8 h-8 rounded-full overflow-hidden">
-                    <GorillaAvatarIcon variant="default" />
-                  </div>
-                  <div v-else class="skeleton-avatar"></div>
-                  <span v-if="!loading" class="hidden sm:block">{{ user?.name || 'User' }}</span>
-                  <div v-else class="skeleton-text w-20 hidden sm:block"></div>
-                  <ChevronDownIcon className="w-4 h-4" />
-                </button>
+                <RippleEffect color="rgba(107, 114, 128, 0.3)">
+                  <button
+                    @click="showUserMenu = !showUserMenu"
+                    class="flex items-center space-x-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                  >
+                    <div v-if="!loading" class="w-8 h-8 rounded-full overflow-hidden">
+                      <GorillaAvatarIcon variant="default" />
+                    </div>
+                    <div v-else class="skeleton-avatar"></div>
+                    <span v-if="!loading" class="hidden sm:block">{{ user?.name || 'User' }}</span>
+                    <div v-else class="skeleton-text w-20 hidden sm:block"></div>
+                    <ChevronDownIcon className="w-4 h-4" />
+                  </button>
+                </RippleEffect>
 
                 <!-- Dropdown Menu -->
                 <div v-if="showUserMenu" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-10">
@@ -102,13 +106,15 @@
                       <UserSettingsIcon className="w-4 h-4 mr-2" />
                       Profile & API
                     </router-link>
-                    <button
-                      @click="handleLogout"
-                      class="w-full flex items-center px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-700 dark:hover:text-rose-300 transition-all duration-200"
-                    >
-                      <LogoutIcon className="w-4 h-4 mr-2" />
-                      Sign out
-                    </button>
+                    <RippleEffect color="rgba(225, 29, 72, 0.3)">
+                      <button
+                        @click="handleLogout"
+                        class="w-full flex items-center px-4 py-2 text-sm text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-700 dark:hover:text-rose-300 transition-all duration-200"
+                      >
+                        <LogoutIcon className="w-4 h-4 mr-2" />
+                        Sign out
+                      </button>
+                    </RippleEffect>
                   </div>
                 </div>
               </div>
@@ -150,6 +156,7 @@ import SidebarLink from '../components/SidebarLink.vue'
 import LogoutIcon from '../components/icons/LogoutIcon.vue'
 import DashboardIcon from '../components/icons/DashboardIcon.vue'
 import UserSettingsIcon from '../components/icons/UserSettingsIcon.vue'
+import RippleEffect from '../components/RippleEffect.vue'
 
 export default {
   name: 'AppLayout',
@@ -165,7 +172,8 @@ export default {
     SidebarLink,
     LogoutIcon,
     DashboardIcon,
-    UserSettingsIcon
+    UserSettingsIcon,
+    RippleEffect
   },
   setup() {
     const router = useRouter()

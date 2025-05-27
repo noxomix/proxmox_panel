@@ -63,20 +63,22 @@
                     </div>
 
                     <!-- Submit Button -->
-                    <button
-                        type="submit"
-                        :disabled="loading"
-                        class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
-                    >
-                        <span
-                            v-if="loading"
-                            class="flex items-center justify-center"
+                    <RippleEffect :disabled="loading" color="rgba(255, 255, 255, 0.3)">
+                        <button
+                            type="submit"
+                            :disabled="loading"
+                            class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
                         >
-                            <SpinnerIcon />
-                            Signing in...
-                        </span>
-                        <span v-else>Login</span>
-                    </button>
+                            <span
+                                v-if="loading"
+                                class="flex items-center justify-center"
+                            >
+                                <SpinnerIcon />
+                                Signing in...
+                            </span>
+                            <span v-else>Login</span>
+                        </button>
+                    </RippleEffect>
                 </form>
 
                 <!-- Footer -->
@@ -99,6 +101,7 @@ import PasswordInput from "../components/PasswordInput.vue";
 import SpinnerIcon from "../components/icons/SpinnerIcon.vue";
 import DarkModeToggle from "../components/DarkModeToggle.vue";
 import AppLogo from "../components/AppLogo.vue";
+import RippleEffect from "../components/RippleEffect.vue";
 
 export default {
     name: "Login",
@@ -108,6 +111,7 @@ export default {
         SpinnerIcon,
         DarkModeToggle,
         AppLogo,
+        RippleEffect,
     },
     setup() {
         const router = useRouter();

@@ -52,20 +52,22 @@
         </div>
 
         <!-- Submit Button -->
-        <button
-          type="submit"
-          :disabled="passwordLoading"
-          class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
-        >
-          <span v-if="passwordLoading" class="flex items-center">
-            <SpinnerIcon />
-            Changing Password...
-          </span>
-          <span v-else class="flex items-center">
-            <CheckIcon className="w-4 h-4 mr-2" />
-            Change Password
-          </span>
-        </button>
+        <RippleEffect :disabled="passwordLoading" color="rgba(255, 255, 255, 0.3)">
+          <button
+            type="submit"
+            :disabled="passwordLoading"
+            class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
+          >
+            <span v-if="passwordLoading" class="flex items-center">
+              <SpinnerIcon />
+              Changing Password...
+            </span>
+            <span v-else class="flex items-center">
+              <CheckIcon className="w-4 h-4 mr-2" />
+              Change Password
+            </span>
+          </button>
+        </RippleEffect>
       </form>
     </div>
 
@@ -73,21 +75,23 @@
     <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">API Token</h2>
-        <button
-          @click="generateApiToken"
-          :disabled="tokenLoading"
-          :class="currentApiToken ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'"
-          class="disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-all text-sm"
-        >
-          <span v-if="tokenLoading" class="flex items-center">
-            <SpinnerIcon />
-            Generating...
-          </span>
-          <span v-else class="flex items-center">
-            <RefreshIcon v-if="currentApiToken" className="w-4 h-4 mr-2" />
-            {{ currentApiToken ? 'Regenerate Token' : 'Generate New Token' }}
-          </span>
-        </button>
+        <RippleEffect :disabled="tokenLoading" color="rgba(255, 255, 255, 0.3)">
+          <button
+            @click="generateApiToken"
+            :disabled="tokenLoading"
+            :class="currentApiToken ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'"
+            class="disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-all text-sm"
+          >
+            <span v-if="tokenLoading" class="flex items-center">
+              <SpinnerIcon />
+              Generating...
+            </span>
+            <span v-else class="flex items-center">
+              <RefreshIcon v-if="currentApiToken" className="w-4 h-4 mr-2" />
+              {{ currentApiToken ? 'Regenerate Token' : 'Generate New Token' }}
+            </span>
+          </button>
+        </RippleEffect>
       </div>
 
       <p class="text-gray-600 dark:text-gray-400 mb-4">
@@ -119,21 +123,25 @@
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Active Sessions</h2>
         <div class="flex items-center space-x-3">
-          <button
-            @click="revokeAllSessions"
-            :disabled="sessionsLoading || sessions.length <= 1"
-            class="text-xs px-3 py-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Sign out all other devices
-          </button>
-          <button
-            @click="loadSessions"
-            :disabled="sessionsLoading"
-            class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-          >
-            <span v-if="sessionsLoading">Loading...</span>
-            <span v-else>Refresh</span>
-          </button>
+          <RippleEffect :disabled="sessionsLoading || sessions.length <= 1" color="rgba(234, 88, 12, 0.3)">
+            <button
+              @click="revokeAllSessions"
+              :disabled="sessionsLoading || sessions.length <= 1"
+              class="text-xs px-3 py-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Sign out all other devices
+            </button>
+          </RippleEffect>
+          <RippleEffect :disabled="sessionsLoading" color="rgba(37, 99, 235, 0.3)">
+            <button
+              @click="loadSessions"
+              :disabled="sessionsLoading"
+              class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
+            >
+              <span v-if="sessionsLoading">Loading...</span>
+              <span v-else>Refresh</span>
+            </button>
+          </RippleEffect>
         </div>
       </div>
 
@@ -163,12 +171,14 @@
               Expires: {{ formatDate(session.expires_at) }}
             </p>
           </div>
-          <button
-            @click="session.is_current ? handleCurrentSessionLogout() : revokeSession(session.id)"
-            class="ml-4 text-xs px-2 py-1 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
-          >
-            Sign out{{ session.is_current ? ' (current)' : '' }}
-          </button>
+          <RippleEffect color="rgba(220, 38, 38, 0.3)">
+            <button
+              @click="session.is_current ? handleCurrentSessionLogout() : revokeSession(session.id)"
+              class="ml-4 text-xs px-2 py-1 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
+            >
+              Sign out{{ session.is_current ? ' (current)' : '' }}
+            </button>
+          </RippleEffect>
         </div>
       </div>
 
@@ -195,6 +205,7 @@ import SpinnerIcon from '../components/icons/SpinnerIcon.vue'
 import CheckIcon from '../components/icons/CheckIcon.vue'
 import RefreshIcon from '../components/icons/RefreshIcon.vue'
 import CopyButton from '../components/CopyButton.vue'
+import RippleEffect from '../components/RippleEffect.vue'
 
 export default {
   name: 'Profile',
@@ -203,7 +214,8 @@ export default {
     SpinnerIcon,
     CheckIcon,
     RefreshIcon,
-    CopyButton
+    CopyButton,
+    RippleEffect
   },
   setup() {
     const router = useRouter()
