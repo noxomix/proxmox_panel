@@ -1,305 +1,225 @@
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex justify-between items-center">
+    <!-- Header with Controls -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Manage user accounts and permissions
         </p>
       </div>
-    </div>
-
-    <!-- Search and Filters -->
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Search Input -->
-        <div>
-          <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Search Users
-          </label>
+      
+      <!-- Controls: Search, Filter, Create Button -->
+      <div class="flex flex-col sm:flex-row gap-3">
+        <!-- Search Input with Icon -->
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
           <input
-            id="search"
             v-model="searchQuery"
             type="text"
-            placeholder="Search by name, email, or username..."
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            placeholder="Search users..."
+            class="w-full sm:w-64 pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:bg-gray-700 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 transition-colors"
             @input="debouncedSearch"
           />
         </div>
 
-        <!-- Status Filter -->
-        <div>
-          <label for="status-filter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Filter by Status
-          </label>
+        <!-- Status Filter Dropdown -->
+        <div class="relative">
           <select
-            id="status-filter"
             v-model="statusFilter"
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+            class="w-full sm:w-auto pl-3 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:bg-gray-700 dark:text-white appearance-none bg-white dark:bg-gray-700 transition-colors cursor-pointer"
             @change="loadUsers"
           >
-            <option value="">All Statuses</option>
+            <option value="">All Status</option>
             <option value="active">Active</option>
             <option value="disabled">Disabled</option>
             <option value="blocked">Blocked</option>
           </select>
+          <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+            <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         </div>
+
+        <!-- Create User Button -->
+        <CreateButton @click="showCreateUser = true">
+          Create User
+        </CreateButton>
       </div>
     </div>
 
     <!-- Users Table -->
-    <div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
-      <!-- Loading State -->
-      <div v-if="loading" class="p-8 text-center">
-        <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-gray-500 dark:text-gray-400">
-          <SpinnerIcon class="animate-spin -ml-1 mr-3 h-5 w-5" />
-          Loading users...
-        </div>
-      </div>
-
-      <!-- Error State -->
-      <div v-else-if="error" class="p-8 text-center">
-        <div class="text-red-600 dark:text-red-400">
-          <p class="font-medium">Failed to load users</p>
-          <p class="text-sm mt-1">{{ error }}</p>
-          <button
-            @click="loadUsers"
-            class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+    <BaseTable
+      :data="users"
+      :loading="loading"
+      :error="error"
+      loading-text="Loading users..."
+      error-title="Failed to load users"
+      @retry="loadUsers"
+    >
+      <template #header>
+        <tr>
+          <th 
+            scope="col" 
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
+            @click="sortBy('name')"
           >
-            Try Again
-          </button>
-        </div>
-      </div>
-
-      <!-- Users Table -->
-      <div v-else-if="users.length > 0" class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-200 dark:bg-gray-700">
-            <tr>
-              <th 
-                scope="col" 
-                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
-                @click="sortBy('id')"
-              >
-                <div class="flex items-center space-x-1">
-                  <span>ID</span>
-                  <ChevronDownIcon 
-                    v-if="sortField === 'id'" 
-                    :class="{ 'transform rotate-180': sortOrder === 'asc' }"
-                    class="w-4 h-4 transition-transform duration-200"
-                  />
-                </div>
-              </th>
-              <th 
-                scope="col" 
-                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
-                @click="sortBy('name')"
-              >
-                <div class="flex items-center space-x-1">
-                  <span>Name</span>
-                  <ChevronDownIcon 
-                    v-if="sortField === 'name'" 
-                    :class="{ 'transform rotate-180': sortOrder === 'asc' }"
-                    class="w-4 h-4 transition-transform duration-200"
-                  />
-                </div>
-              </th>
-              <th 
-                scope="col" 
-                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
-                @click="sortBy('email')"
-              >
-                <div class="flex items-center space-x-1">
-                  <span>Email</span>
-                  <ChevronDownIcon 
-                    v-if="sortField === 'email'" 
-                    :class="{ 'transform rotate-180': sortOrder === 'asc' }"
-                    class="w-4 h-4 transition-transform duration-200"
-                  />
-                </div>
-              </th>
-              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Role
-              </th>
-              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Status
-              </th>
-              <th 
-                scope="col" 
-                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
-                @click="sortBy('created_at')"
-              >
-                <div class="flex items-center space-x-1">
-                  <span>Created</span>
-                  <ChevronDownIcon 
-                    v-if="sortField === 'created_at'" 
-                    :class="{ 'transform rotate-180': sortOrder === 'asc' }"
-                    class="w-4 h-4 transition-transform duration-200"
-                  />
-                </div>
-              </th>
-              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-            <tr 
-              v-for="(user, index) in users" 
-              :key="user.id"
-              :class="[
-                'hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150',
-                index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900'
-              ]"
-            >
-              <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                {{ user.id.slice(0, 8) }}...
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <div class="flex items-center">
-                  <UserIcon :className="'w-6 h-6 text-gray-400 dark:text-gray-500 mr-2'" />
-                  <div>
-                    <div class="text-sm font-medium text-gray-900 dark:text-white">
-                      {{ user.name }}
-                    </div>
-                  </div>
-                </div>
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                {{ user.email }}
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <RoleBadge :role="user.role_name || user.role_display_name ? { name: user.role_name, display_name: user.role_display_name } : null" />
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <StatusBadge :status="user.status" />
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                {{ formatDate(user.created_at) }}
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                <div class="flex items-center space-x-2">
-                  <ActionButton
-                    variant="edit"
-                    title="Edit user"
-                    icon="EditIcon"
-                    @click="editUser(user)"
-                  />
-                  <ActionButton
-                    variant="impersonate"
-                    title="Impersonate user"
-                    icon="ImpersonateIcon"
-                    @click="impersonateUser(user)"
-                  />
-                  <ActionButton
-                    variant="delete"
-                    title="Delete user"
-                    icon="DeleteIcon"
-                    @click="deleteUser(user)"
-                  />
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Empty State -->
-      <div v-else class="p-8 text-center">
-        <UserIcon :className="'mx-auto h-12 w-12 text-gray-400 dark:text-gray-500'" />
-        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No users found</h3>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {{ searchQuery ? 'Try adjusting your search criteria.' : 'No users have been created yet.' }}
-        </p>
-      </div>
-
-      <!-- Pagination -->
-      <div v-if="pagination" class="bg-white dark:bg-gray-800 px-4 py-4 mt-2 border-t border-gray-200 dark:border-gray-700 sm:px-6">
-        <div class="flex items-center justify-between">
-          <!-- Left side: Results info -->
-          <div class="flex items-center space-x-4">
-            <p class="text-sm text-gray-700 dark:text-gray-300">
-              Showing
-              <span class="font-medium">{{ (pagination.page - 1) * pagination.limit + 1 }}</span>
-              to
-              <span class="font-medium">{{ Math.min(pagination.page * pagination.limit, pagination.total) }}</span>
-              of
-              <span class="font-medium">{{ pagination.total }}</span>
-              results
-            </p>
-          </div>
-          
-          <!-- Center: Page navigation -->
-          <div class="flex items-center">
-            <!-- Previous page arrow -->
-            <button
-              :disabled="!pagination.hasPrev"
-              @click="changePage(pagination.page - 1)"
-              :class="{
-                'opacity-40 cursor-not-allowed': !pagination.hasPrev,
-                'hover:bg-gray-50 dark:hover:bg-gray-700': pagination.hasPrev
-              }"
-              class="px-2 py-2 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border-t border-b border-l border-gray-300 dark:border-gray-600 rounded-l-lg transition-colors duration-150"
-            >
-              <ChevronDownIcon class="h-4 w-4 transform rotate-90" />
-            </button>
-            
-            <!-- Page numbers -->
-            <div class="flex">
-              <template v-for="page in getVisiblePages()" :key="page">
-                <button
-                  v-if="page !== '...'"
-                  @click="changePage(page)"
-                  :class="{
-                    'bg-slate-600 text-white border-slate-600 shadow-sm dark:bg-slate-600 dark:border-slate-600': page === pagination.page,
-                    'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700': page !== pagination.page
-                  }"
-                  class="px-3 py-1.5 text-sm font-medium border-t border-b border-r -ml-px transition-colors duration-150 min-w-[40px]"
-                >
-                  {{ page }}
-                </button>
-                <span v-else class="px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border-t border-b border-r -ml-px">
-                  ...
-                </span>
-              </template>
+            <div class="flex items-center space-x-1">
+              <span>User</span>
+              <ChevronDownIcon 
+                v-if="sortField === 'name'" 
+                :class="{ 'transform rotate-180': sortOrder === 'asc' }"
+                class="w-4 h-4 transition-transform duration-200"
+              />
             </div>
-            
-            <!-- Next page arrow -->
-            <button
-              :disabled="!pagination.hasNext"
-              @click="changePage(pagination.page + 1)"
-              :class="{
-                'opacity-40 cursor-not-allowed': !pagination.hasNext,
-                'hover:bg-gray-50 dark:hover:bg-gray-700': pagination.hasNext
-              }"
-              class="px-2 py-2 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-r-lg -ml-px transition-colors duration-150"
-            >
-              <ChevronDownIcon class="h-4 w-4 transform -rotate-90" />
-            </button>
-          </div>
-          
-          <!-- Right side: Items per page -->
-          <div class="flex items-center space-x-2">
-            <label for="per-page" class="text-sm text-gray-700 dark:text-gray-300">
-              Show:
-            </label>
-            <select
-              id="per-page"
-              v-model="perPage"
-              class="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              @change="loadUsers"
-            >
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-            </select>
-            <span class="text-sm text-gray-700 dark:text-gray-300">per page</span>
-          </div>
-        </div>
-      </div>
-    </div>
+          </th>
+          <th 
+            scope="col" 
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
+            @click="sortBy('email')"
+          >
+            <div class="flex items-center space-x-1">
+              <span>Email</span>
+              <ChevronDownIcon 
+                v-if="sortField === 'email'" 
+                :class="{ 'transform rotate-180': sortOrder === 'asc' }"
+                class="w-4 h-4 transition-transform duration-200"
+              />
+            </div>
+          </th>
+          <th 
+            scope="col" 
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
+            @click="sortBy('role_name')"
+          >
+            <div class="flex items-center space-x-1">
+              <span>Role</span>
+              <ChevronDownIcon 
+                v-if="sortField === 'role_name'" 
+                :class="{ 'transform rotate-180': sortOrder === 'asc' }"
+                class="w-4 h-4 transition-transform duration-200"
+              />
+            </div>
+          </th>
+          <th 
+            scope="col" 
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
+            @click="sortBy('status')"
+          >
+            <div class="flex items-center space-x-1">
+              <span>Status</span>
+              <ChevronDownIcon 
+                v-if="sortField === 'status'" 
+                :class="{ 'transform rotate-180': sortOrder === 'asc' }"
+                class="w-4 h-4 transition-transform duration-200"
+              />
+            </div>
+          </th>
+          <th 
+            scope="col" 
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
+            @click="sortBy('created_at')"
+          >
+            <div class="flex items-center space-x-1">
+              <span>Created</span>
+              <ChevronDownIcon 
+                v-if="sortField === 'created_at'" 
+                :class="{ 'transform rotate-180': sortOrder === 'asc' }"
+                class="w-4 h-4 transition-transform duration-200"
+              />
+            </div>
+          </th>
+          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            Actions
+          </th>
+        </tr>
+      </template>
+
+      <template #body>
+        <tr 
+          v-for="(user, index) in users" 
+          :key="user.id"
+          class="odd:bg-gray-50 odd:dark:bg-gray-700 even:bg-white even:dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          <td class="px-6 py-4 whitespace-nowrap">
+            <div class="flex items-center">
+              <UserIcon :className="'w-8 h-8 text-gray-400 dark:text-gray-500 mr-3'" />
+              <div>
+                <div class="text-sm font-medium text-gray-900 dark:text-white">
+                  {{ user.name }}
+                </div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ user.username || 'No username' }}
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+            {{ user.email }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <RoleBadge :role="user.role_name ? { name: user.role_name, display_name: user.role_display_name } : null" />
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
+            <StatusBadge :status="user.status" />
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+            {{ formatDate(user.created_at) }}
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <div class="flex items-center space-x-2">
+              <ActionButton
+                variant="edit"
+                title="Edit user"
+                icon="EditIcon"
+                @click="editUser(user)"
+              />
+              <ActionButton
+                variant="impersonate"
+                title="Impersonate user"
+                icon="ImpersonateIcon"
+                @click="impersonateUser(user)"
+              />
+              <ActionButton
+                variant="delete"
+                title="Delete user"
+                icon="DeleteIcon"
+                @click="deleteUser(user)"
+              />
+            </div>
+          </td>
+        </tr>
+      </template>
+
+      <template #empty>
+        <UserIcon :className="'mx-auto h-12 w-12 text-gray-400 dark:text-gray-500'" />
+        <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">{{ emptyStateTitle }}</h3>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {{ emptyStateMessage }}
+        </p>
+        <button
+          v-if="hasActiveFilters"
+          @click="clearFilters"
+          class="mt-3 inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-colors"
+        >
+          Clear filters
+        </button>
+      </template>
+    </BaseTable>
+
+    <!-- Pagination -->
+    <TablePagination
+      v-if="pagination"
+      :pagination="pagination"
+      :per-page="perPage"
+      @page-change="changePage"
+      @per-page-change="handlePerPageChange"
+    />
   </div>
 </template>
 
@@ -309,12 +229,15 @@ import { api } from '../utils/api.js';
 import StatusBadge from '../components/StatusBadge.vue';
 import RoleBadge from '../components/RoleBadge.vue';
 import UserIcon from '../components/icons/UserIcon.vue';
-import ChevronDownIcon from '../components/icons/ChevronDownIcon.vue';
 import SpinnerIcon from '../components/icons/SpinnerIcon.vue';
 import EditIcon from '../components/icons/EditIcon.vue';
 import DeleteIcon from '../components/icons/DeleteIcon.vue';
 import ImpersonateIcon from '../components/icons/ImpersonateIcon.vue';
+import TablePagination from '../components/TablePagination.vue';
 import ActionButton from '../components/ActionButton.vue';
+import BaseTable from '../components/BaseTable.vue';
+import ChevronDownIcon from '../components/icons/ChevronDownIcon.vue';
+import CreateButton from '../components/CreateButton.vue';
 
 export default {
   name: 'Users',
@@ -322,12 +245,15 @@ export default {
     StatusBadge,
     RoleBadge,
     UserIcon,
-    ChevronDownIcon,
     SpinnerIcon,
     EditIcon,
     DeleteIcon,
     ImpersonateIcon,
-    ActionButton
+    ActionButton,
+    TablePagination,
+    BaseTable,
+    ChevronDownIcon,
+    CreateButton
   },
   setup() {
     const users = ref([]);
@@ -340,6 +266,9 @@ export default {
     const statusFilter = ref('');
     const perPage = ref(10);
     
+    // Modal states
+    const showCreateUser = ref(false);
+    
     // Sorting
     const sortField = ref('created_at');
     const sortOrder = ref('desc');
@@ -351,6 +280,40 @@ export default {
       searchTimeout = setTimeout(() => {
         loadUsers();
       }, 300);
+    };
+
+    // Empty state logic
+    const hasActiveFilters = computed(() => {
+      return searchQuery.value.trim() || statusFilter.value;
+    });
+
+    const emptyStateTitle = computed(() => {
+      if (hasActiveFilters.value) {
+        return 'No users found';
+      }
+      return 'No users created yet';
+    });
+
+    const emptyStateMessage = computed(() => {
+      if (searchQuery.value.trim() && statusFilter.value) {
+        return `No users match your search "${searchQuery.value}" with status "${statusFilter.value}".`;
+      } else if (searchQuery.value.trim()) {
+        return `No users match your search "${searchQuery.value}".`;
+      } else if (statusFilter.value) {
+        return `No users found with status "${statusFilter.value}".`;
+      }
+      return 'Get started by creating your first user account.';
+    });
+
+    const clearFilters = () => {
+      searchQuery.value = '';
+      statusFilter.value = '';
+      loadUsers();
+    };
+
+    const handlePerPageChange = (newPerPage) => {
+      perPage.value = newPerPage;
+      loadUsers(1); // Reset to page 1 when changing per page
     };
 
     const loadUsers = async (page = 1) => {
@@ -485,12 +448,17 @@ export default {
       perPage,
       sortField,
       sortOrder,
+      showCreateUser,
+      hasActiveFilters,
+      emptyStateTitle,
+      emptyStateMessage,
       loadUsers,
       sortBy,
       changePage,
-      getVisiblePages,
+      handlePerPageChange,
       formatDate,
       debouncedSearch,
+      clearFilters,
       editUser,
       deleteUser,
       impersonateUser

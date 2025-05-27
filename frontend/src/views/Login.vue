@@ -69,7 +69,7 @@
                             :disabled="loading"
                             @click="createRipple"
                             @touchstart="createRipple"
-                            class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
+                            class="w-full bg-brand-600 hover:bg-brand-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
                         >
                             <span
                                 v-if="loading"

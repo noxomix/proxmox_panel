@@ -47,7 +47,7 @@ users.get('/', async (c) => {
     }
 
     // Validate sort parameters
-    const validSortFields = ['id', 'name', 'email', 'status', 'created_at', 'updated_at'];
+    const validSortFields = ['id', 'name', 'email', 'status', 'created_at', 'updated_at', 'role_name'];
     const validSortOrders = ['asc', 'desc'];
     
     if (!validSortFields.includes(sortBy) || !validSortOrders.includes(sortOrder)) {

@@ -36,6 +36,28 @@ app.route('/api/users', users);
 app.route('/api/roles', roles);
 app.route('/api/permissions', permissions);
 
+// Serve theme CSS dynamically
+app.get('/api/theme-css', async (c) => {
+  try {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const cssPath = path.join(process.cwd(), 'src', 'brand.css');
+    const css = await fs.readFile(cssPath, 'utf-8');
+    
+    return c.text(css, 200, {
+      'Content-Type': 'text/css; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
+  } catch (error) {
+    console.error('Error reading brand.css:', error);
+    return c.text('/* Error loading brand colors */', 500, {
+      'Content-Type': 'text/css; charset=utf-8'
+    });
+  }
+});
+
 // In production, serve static files
 if (process.env.NODE_ENV === 'production') {
   app.use('/*', serveStatic({ root: './frontend/dist' }));

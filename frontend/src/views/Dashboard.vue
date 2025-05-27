@@ -31,8 +31,8 @@
 
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <div class="flex items-center">
-            <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-              <UserIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <div class="w-12 h-12 bg-brand-100 dark:bg-brand-900/20 rounded-lg flex items-center justify-center">
+              <UserIcon className="w-6 h-6 text-brand-600 dark:text-brand-400" />
             </div>
             <div class="ml-4">
               <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Account Type</p>

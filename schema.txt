@@ -184,5 +184,40 @@
 
 This schema represents the current state and established patterns for the Proxmox Panel project.
 
+## Brand Colors & Design System
+
+The project uses a custom brand color palette defined in Tailwind 4 CSS-only configuration:
+
+### Brand Color Palette (RGB tuples for opacity support)
+- **brand-50**: `239 246 255` - Lightest shade
+- **brand-100**: `219 234 254` - Very light
+- **brand-200**: `191 219 254` - Light
+- **brand-300**: `147 197 253` - Light medium
+- **brand-400**: `96 165 250` - Medium light
+- **brand-500**: `59 130 246` - Base color (default blue)
+- **brand-600**: `37 99 235` - Primary action color
+- **brand-700**: `29 78 216` - Hover states
+- **brand-800**: `30 64 175` - Dark
+- **brand-900**: `30 58 138` - Darker
+- **brand-950**: `23 37 84` - Darkest
+
+### Usage Guidelines
+- **Primary Actions**: `bg-brand-600` with `hover:bg-brand-700`
+- **Focus States**: `focus:ring-brand-500`
+- **Text Links**: `text-brand-600 dark:text-brand-400`
+- **Borders**: `border-brand-600 dark:border-brand-400`
+
+### CSS Configuration
+Brand colors are defined in `/frontend/src/brand.css` using Tailwind's recommended approach for opacity support:
+
+1. **Base Variables** (`:root`): RGB comma-separated values (e.g., `--brand-600: 37, 99, 235`)
+2. **Tailwind @theme**: Direct variable references (e.g., `--color-brand-600: var(--brand-600)`)
+3. **Opacity Support**: Tailwind automatically creates `rgba(var(--brand-600), opacity)` for modifiers
+
+This approach enables full opacity functionality (e.g., `bg-brand-600/50`) while maintaining easy theming capability.
+
+### Design Consistency
+All interactive elements (buttons, links, form focus states) should use the brand color palette instead of default blue colors for consistent branding throughout the application.
+
 ## Commands
 npm run fresh - freshup database and migrate + Seed

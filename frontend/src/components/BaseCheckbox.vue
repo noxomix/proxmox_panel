@@ -63,7 +63,7 @@ export default {
       }
     },
     checkboxClasses() {
-      const baseClasses = 'h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 dark:bg-gray-700 dark:focus:ring-blue-600 transition-colors'
+      const baseClasses = 'h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-brand-600 focus:ring-brand-500 dark:bg-gray-700 dark:focus:ring-brand-600 transition-colors'
       const errorClasses = 'border-red-300 dark:border-red-600 text-red-600 focus:ring-red-500'
       const disabledClasses = 'opacity-50 cursor-not-allowed'
       

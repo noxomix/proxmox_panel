@@ -58,7 +58,7 @@
             :disabled="passwordLoading"
             @click="createRipple"
             @touchstart="createRipple"
-            class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
+            class="bg-brand-600 hover:bg-brand-700 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
           >
             <span v-if="passwordLoading" class="flex items-center">
               <SpinnerIcon />
@@ -82,7 +82,7 @@
             @click="(e) => { createRipple(e); generateApiToken(); }"
             @touchstart="createRipple"
             :disabled="tokenLoading"
-            :class="currentApiToken ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'"
+            :class="currentApiToken ? 'bg-brand-600 hover:bg-brand-700' : 'bg-green-600 hover:bg-green-700'"
             class="disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-all text-sm"
           >
             <span v-if="tokenLoading" class="flex items-center">
@@ -138,7 +138,7 @@
               @click="(e) => { createRipple(e); loadSessions(); }"
               @touchstart="createRipple"
               :disabled="sessionsLoading"
-              class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
+              class="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 text-sm"
             >
               <span v-if="sessionsLoading">Loading...</span>
               <span v-else>Refresh</span>

@@ -11,6 +11,9 @@ class User {
     this.status = data.status;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
+    // Include joined role data from pagination
+    this.role_name = data.role_name;
+    this.role_display_name = data.role_display_name;
   }
 
   static get tableName() {
@@ -230,7 +233,15 @@ class User {
     const [{ total }] = await countQuery;
     
     // Add sorting and pagination
-    const orderColumn = sortBy.includes('.') ? sortBy : `users.${sortBy}`;
+    let orderColumn;
+    if (sortBy.includes('.')) {
+      orderColumn = sortBy;
+    } else if (sortBy === 'role_name' || sortBy === 'role_display_name') {
+      orderColumn = `roles.${sortBy.replace('role_', '')}`;
+    } else {
+      orderColumn = `users.${sortBy}`;
+    }
+    
     query = query
       .orderBy(orderColumn, sortOrder)
       .limit(limit)

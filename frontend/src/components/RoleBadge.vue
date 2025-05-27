@@ -45,12 +45,12 @@ export default {
                     icon: "BriefcaseIcon",
                 },
                 customer: {
-                    badgeClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
+                    badgeClass: "bg-brand-100 text-brand-800 dark:bg-brand-900/20 dark:text-brand-400",
                     iconClass: "w-3 h-3",
                     icon: "UserIcon",
                 },
                 user: {
-                    badgeClass: "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400",
+                    badgeClass: "bg-brand-100 text-brand-800 dark:bg-brand-900/20 dark:text-brand-400",
                     iconClass: "w-3 h-3",
                     icon: "UserIcon",
                 },
