@@ -173,6 +173,7 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
             <div class="flex items-center space-x-2">
               <ActionButton
+                v-if="canEditUser(user)"
                 variant="edit"
                 title="Edit user"
                 icon="EditIcon"
@@ -185,8 +186,9 @@
                 @click="impersonateUser(user)"
               />
               <ActionButton
+                v-if="user.status === 'disabled'"
                 variant="delete"
-                title="Delete user"
+                title="Delete user (only available for disabled users)"
                 icon="DeleteIcon"
                 @click="deleteUser(user)"
               />
@@ -219,6 +221,14 @@
       @page-change="changePage"
       @per-page-change="handlePerPageChange"
     />
+
+    <!-- Create/Edit User Modal -->
+    <UserModal
+      :show="showCreateUser || showEditUser"
+      :user="selectedUser"
+      @close="closeModal"
+      @saved="handleUserSaved"
+    />
   </div>
 </template>
 
@@ -238,6 +248,7 @@ import BaseTable from '../components/BaseTable.vue';
 import ChevronDownIcon from '../components/icons/ChevronDownIcon.vue';
 import CreateButton from '../components/CreateButton.vue';
 import Avatar from '../components/Avatar.vue';
+import UserModal from '../components/UserModal.vue';
 import { getAvatarImage } from '../utils/avatarHelper.js';
 
 export default {
@@ -255,7 +266,8 @@ export default {
     BaseTable,
     ChevronDownIcon,
     CreateButton,
-    Avatar
+    Avatar,
+    UserModal
   },
   setup() {
     const users = ref([]);
@@ -270,6 +282,11 @@ export default {
     
     // Modal states
     const showCreateUser = ref(false);
+    const showEditUser = ref(false);
+    const selectedUser = ref(null);
+    
+    // Current user for role comparison
+    const currentUser = ref(null);
     
     // Sorting
     const sortField = ref('created_at');
@@ -410,6 +427,50 @@ export default {
       return pages;
     };
 
+    const closeModal = () => {
+      showCreateUser.value = false;
+      showEditUser.value = false;
+      selectedUser.value = null;
+    };
+
+    const handleUserSaved = async (userData) => {
+      // Refresh the users list
+      await loadUsers();
+    };
+
+    const loadCurrentUser = async () => {
+      try {
+        const response = await api.get('/auth/profile');
+        if (response.success) {
+          currentUser.value = response.data.user;
+        }
+      } catch (error) {
+        console.error('Failed to load current user:', error);
+      }
+    };
+
+    // Role hierarchy for UI checks
+    const roleHierarchy = {
+      'admin': 1,
+      'manager': 2, 
+      'customer': 3,
+      'user': 4
+    };
+
+    const getRoleLevel = (roleName) => {
+      return roleHierarchy[roleName] || 999;
+    };
+
+    const canEditUser = (user) => {
+      if (!currentUser.value || !currentUser.value.role_name) return false;
+      
+      // Can't edit users with higher or equal roles
+      const currentUserLevel = getRoleLevel(currentUser.value.role_name);
+      const targetUserLevel = getRoleLevel(user.role_name);
+      
+      return currentUserLevel < targetUserLevel; // Changed from <= to < (strictly lower)
+    };
+
     const formatDate = (dateString) => {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', {
@@ -422,13 +483,27 @@ export default {
     };
 
     const editUser = (user) => {
-      console.log('Edit user:', user);
-      // TODO: Implement edit functionality
+      selectedUser.value = user;
+      showEditUser.value = true;
     };
 
-    const deleteUser = (user) => {
-      console.log('Delete user:', user);
-      // TODO: Implement delete functionality
+    const deleteUser = async (user) => {
+      if (!confirm(`Are you sure you want to delete user "${user.name}"? This action cannot be undone.`)) {
+        return;
+      }
+      
+      try {
+        const response = await api.delete(`/users/${user.id}`);
+        if (response.success) {
+          // Refresh the users list
+          await loadUsers();
+        } else {
+          alert(response.message || 'Failed to delete user');
+        }
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Failed to delete user');
+      }
     };
 
     const impersonateUser = (user) => {
@@ -436,8 +511,8 @@ export default {
       // TODO: Implement impersonate functionality
     };
 
-    onMounted(() => {
-      loadUsers();
+    onMounted(async () => {
+      await Promise.all([loadUsers(), loadCurrentUser()]);
     });
 
     return {
@@ -451,6 +526,8 @@ export default {
       sortField,
       sortOrder,
       showCreateUser,
+      showEditUser,
+      selectedUser,
       hasActiveFilters,
       emptyStateTitle,
       emptyStateMessage,
@@ -461,6 +538,9 @@ export default {
       formatDate,
       debouncedSearch,
       clearFilters,
+      closeModal,
+      handleUserSaved,
+      canEditUser,
       editUser,
       deleteUser,
       impersonateUser,

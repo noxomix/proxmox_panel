@@ -12,6 +12,30 @@ const roleController = new Hono();
 roleController.use('*', authMiddleware);
 roleController.use('*', requirePermission('role_manage'));
 
+/**
+ * GET /api/roles/assignable - Get roles that current user can assign
+ */
+roleController.get('/assignable', async (c) => {
+    try {
+        const currentUser = c.get('user');
+        const userRole = await User.getRole(currentUser.id);
+        
+        if (!userRole) {
+            return c.json(apiResponse.error('User has no role assigned'), 403);
+        }
+
+        const assignableRoles = await Role.getAssignableRoles(userRole.name);
+        
+        return c.json(
+            apiResponse.success({ roles: assignableRoles }, 'Assignable roles retrieved successfully'),
+            200
+        );
+    } catch (error) {
+        console.error('Get assignable roles error:', error);
+        return c.json(apiResponse.error('Failed to retrieve assignable roles'), 500);
+    }
+});
+
 roleController.get('/', async (c) => {
     try {
         const page = Math.max(1, parseInt(c.req.query('page')) || 1);
@@ -20,9 +44,10 @@ roleController.get('/', async (c) => {
         
         const result = await Role.paginate({ page, limit, search });
         
-        // Load permissions for each role
+        // Load permissions and user count for each role
         for (const role of result.data) {
             role.permissions = await Role.getPermissions(role.id);
+            role.user_count = await Role.getUserCount(role.id);
         }
         
         return c.json(apiResponse.success(result, 'Roles retrieved successfully'));
@@ -225,6 +250,15 @@ roleController.delete('/:id', async (c) => {
 
         if (role.is_system) {
             return c.json(apiResponse.error( 'Cannot delete system role'), 403);
+        }
+
+        // Check if any users are assigned to this role
+        const userCount = await Role.getUserCount(id);
+        if (userCount > 0) {
+            return c.json(
+                apiResponse.forbidden(`Cannot delete role. ${userCount} user(s) are still assigned to this role. Please reassign these users first.`),
+                403
+            );
         }
 
         await Role.delete(id);

@@ -33,6 +33,30 @@ export const security = {
   },
 
   /**
+   * Validate real name format (allows spaces, multiple words)
+   */
+  isValidName(name) {
+    // Allow letters, spaces, hyphens, apostrophes (for names like O'Connor, Jean-Pierre)
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]{2,50}$/;
+    return nameRegex.test(name.trim()) && name.trim().length >= 2;
+  },
+
+  /**
+   * Validate login identity (username or email with spaces allowed)
+   */
+  isValidLoginIdentity(identity) {
+    // If it contains @, it's an email
+    if (identity.includes('@')) {
+      return this.isValidEmail(identity);
+    }
+    
+    // For usernames, allow letters, numbers, spaces, underscores, hyphens
+    // More permissive than isValidUsername to allow display names as login
+    const usernameRegex = /^[a-zA-ZÀ-ÿ0-9\s_-]{2,50}$/;
+    return usernameRegex.test(identity.trim()) && identity.trim().length >= 2;
+  },
+
+  /**
    * Validate password strength
    */
   validatePassword(password) {
@@ -95,12 +119,9 @@ export const security = {
     } else {
       const sanitizedIdentity = this.sanitizeInput(identity);
       
-      // Check if it's email or username format
-      const isEmail = sanitizedIdentity.includes('@');
-      if (isEmail && !this.isValidEmail(sanitizedIdentity)) {
-        errors.identity = ['Invalid email format'];
-      } else if (!isEmail && !this.isValidUsername(sanitizedIdentity)) {
-        errors.identity = ['Invalid username format'];
+      // Validate login identity (email or username with spaces)
+      if (!this.isValidLoginIdentity(sanitizedIdentity)) {
+        errors.identity = ['Invalid login format'];
       }
     }
 

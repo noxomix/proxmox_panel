@@ -19,6 +19,8 @@ auth.use('/login', loginRateLimit);
 
 // Apply auth middleware to protected routes
 auth.use('/token', authMiddleware);
+auth.use('/profile', authMiddleware);
+auth.use('/password', authMiddleware);
 
 auth.post('/login', async (c) => {
     try {
@@ -471,6 +473,44 @@ auth.delete('/sessions', authMiddleware, async (c) => {
     console.error('Revoke all sessions error:', error);
     return c.json(
       apiResponse.error('Internal server error'),
+      500
+    );
+  }
+});
+
+/**
+ * GET /api/auth/profile - Get current user profile
+ */
+auth.get('/profile', async (c) => {
+  try {
+    const { user } = getAuthData(c);
+    
+    // Get full user data with role information
+    const fullUser = await User.findById(user.id);
+    if (!fullUser) {
+      return c.json(
+        apiResponse.error('User not found'),
+        404
+      );
+    }
+
+    // Get user role
+    const userRole = await User.getRole(user.id);
+    
+    return c.json(
+      apiResponse.success({
+        user: {
+          ...fullUser.toJSON(),
+          role_name: userRole?.name || null,
+          role_display_name: userRole?.display_name || null
+        }
+      }, 'Profile retrieved successfully'),
+      200
+    );
+  } catch (error) {
+    console.error('Get profile error:', error);
+    return c.json(
+      apiResponse.error('Failed to retrieve profile'),
       500
     );
   }

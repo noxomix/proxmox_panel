@@ -219,5 +219,118 @@ This approach enables full opacity functionality (e.g., `bg-brand-600/50`) while
 ### Design Consistency
 All interactive elements (buttons, links, form focus states) should use the brand color palette instead of default blue colors for consistent branding throughout the application.
 
+## Role-Based Access Control (RBAC) System
+
+### Role Hierarchy & Permissions Logic
+
+#### Role Hierarchy (Lower number = Higher privilege)
+```
+1. Admin    - Highest privilege, can manage everything
+2. Manager  - Can manage customers and users, but not other managers/admins
+3. Customer - Can manage users only
+4. User     - Lowest privilege, can only manage own profile
+```
+
+#### Core RBAC Rules
+
+##### 1. Role Assignment Rules
+- **Rule**: Users can only assign roles **strictly lower** than their own
+- **Implementation**: `currentLevel < targetLevel`
+- **Examples**:
+  - Admin (1) → Can assign: Manager (2), Customer (3), User (4) ✅
+  - Manager (2) → Can assign: Customer (3), User (4) ✅
+  - Customer (3) → Can assign: User (4) ✅
+  - User (4) → Cannot assign any roles ❌
+
+##### 2. User Management Rules
+- **Edit Restriction**: Can only edit users with **strictly lower** roles
+- **Delete Restriction**: Can only delete **disabled** users with lower roles
+- **Self-Edit Restriction**: Cannot change own role or status
+- **Profile Edit**: Can always edit own name, email, password
+
+##### 3. Permission System Rules
+- **Role Permissions**: Inherited automatically, cannot be removed
+- **Direct Permissions**: Additional permissions beyond role
+- **Permission Rule**: Users cannot have fewer permissions than their role grants
+- **Self-Permission**: Cannot modify own permissions
+- **Assignment Rule**: Can only assign permissions they possess themselves
+
+##### 4. Role Management Rules
+- **Role Creation**: Requires `role_manage` permission
+- **Role Deletion**: Only possible if no users are assigned to that role
+- **System Roles**: Cannot be deleted or have names modified
+- **Permission Assignment**: Can only assign permissions the creator has
+
+#### Permission Categories & Examples
+```
+User Management:
+- user_view, user_create, user_manage, user_delete
+
+Role Management:
+- role_view, role_create, role_manage, role_delete
+
+System:
+- system_admin, dashboard_view
+```
+
+#### UI/UX Security Implementation
+
+##### User Modal Restrictions
+- **Self-Edit Mode**: Role and permission fields disabled with visual feedback
+- **Role Dropdown**: Only shows assignable roles (strictly lower)
+- **Permission Checkboxes**: 
+  - Role permissions: Grayed out, disabled, but checked
+  - Direct permissions: Editable only if not editing self
+- **Default Role**: "Customer" pre-selected for new users
+
+##### User List Restrictions
+- **Edit Button**: Hidden for users with higher or equal roles
+- **Delete Button**: Only visible for disabled users with lower roles
+- **Visual Indicators**: Clear role badges and status indicators
+
+##### Role List Restrictions
+- **Delete Button**: Hidden if users are assigned to role
+- **User Count**: Displayed to show assignment status
+
+#### Backend Validation Stack
+
+##### Authentication Layer
+- JWT + Database session validation
+- Hybrid authentication system
+- Session revocation capability
+
+##### Authorization Layer
+- Permission-based middleware (`requirePermission`)
+- Role hierarchy validation
+- Self-modification protection
+
+##### Data Layer
+- Input sanitization and validation
+- SQL injection prevention
+- Rate limiting on sensitive operations
+
+#### Security Principles Applied
+
+1. **Principle of Least Privilege**: Users get minimal necessary permissions
+2. **Defense in Depth**: Multiple validation layers (Frontend + Backend)
+3. **Zero Trust**: Every operation validated regardless of UI state
+4. **Audit Trail**: All permission changes logged and trackable
+5. **Fail Secure**: Restrictive defaults, explicit permission grants
+
+#### Error Handling & User Feedback
+
+##### User-Friendly Messages
+- "You cannot assign a role higher than your own"
+- "Cannot edit users with higher roles than your own"
+- "Only disabled users can be deleted"
+- "Cannot modify your own permissions"
+
+##### Progressive Disclosure
+- UI elements hidden/disabled based on permissions
+- Contextual help text explaining restrictions
+- Visual feedback for role-inherited vs. direct permissions
+
+This RBAC system ensures secure, hierarchical user management while maintaining intuitive user experience and preventing privilege escalation attacks.
+
 ## Commands
 npm run fresh - freshup database and migrate + Seed

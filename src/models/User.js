@@ -104,6 +104,21 @@ class User {
     return uniquePermissions;
   }
 
+  static async getRolePermissions(userId) {
+    return await db('permissions')
+      .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
+      .join('users', 'role_permissions.role_id', 'users.role_id')
+      .where('users.id', userId)
+      .select('permissions.*');
+  }
+
+  static async getDirectPermissions(userId) {
+    return await db('permissions')
+      .join('user_permissions', 'permissions.id', 'user_permissions.permission_id')
+      .where('user_permissions.user_id', userId)
+      .select('permissions.*');
+  }
+
   static async hasPermission(userId, permissionName) {
     const rolePermission = await db('permissions')
       .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')

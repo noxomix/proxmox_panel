@@ -28,6 +28,9 @@
             Permissions
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+            Users
+          </th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
             Type
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -62,6 +65,11 @@
               {{ role.permissions?.length || 0 }}
             </div>
           </td>
+          <td class="px-6 py-4">
+            <div class="text-sm text-gray-900 dark:text-white">
+              {{ role.user_count || 0 }}
+            </div>
+          </td>
           <td class="px-6 py-4 whitespace-nowrap">
             <span
               :class="role.is_system ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' : 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'"
@@ -79,8 +87,9 @@
                 @click="editRole(role)"
               />
               <ActionButton
+                v-if="role.user_count === 0"
                 variant="delete"
-                title="Delete role"
+                title="Delete role (only available when no users are assigned)"
                 icon="DeleteIcon"
                 @click="deleteRole(role)"
               />

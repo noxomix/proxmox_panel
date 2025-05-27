@@ -143,8 +143,8 @@ users.post('/', async (c) => {
     
     if (!name) {
       errors.name = ['Name is required'];
-    } else if (!security.isValidUsername(name)) {
-      errors.name = ['Invalid name format (3-30 characters, alphanumeric, underscore, dash only)'];
+    } else if (!security.isValidName(name)) {
+      errors.name = ['Invalid name format (2-50 characters, letters, spaces, hyphens and apostrophes only)'];
     }
 
     if (!email) {
@@ -168,6 +168,13 @@ users.post('/', async (c) => {
       const roleExists = await Role.findById(role_id);
       if (!roleExists) {
         errors.role_id = ['Invalid role ID'];
+      } else {
+        // Check if current user can assign this role
+        const { user: currentUser } = getAuthData(c);
+        const currentUserRole = await User.getRole(currentUser.id);
+        if (currentUserRole && !Role.canAssignRole(currentUserRole.name, roleExists.name)) {
+          errors.role_id = ['You cannot assign a role higher than your own'];
+        }
       }
     }
 
@@ -258,8 +265,30 @@ users.put('/:id', async (c) => {
       );
     }
 
+    // Check if current user can edit this user (based on role hierarchy)
+    if (userToUpdate.role_id) {
+      const Role = (await import('../models/Role.js')).Role;
+      const targetUserRole = await Role.findById(userToUpdate.role_id);
+      const currentUserRole = await User.getRole(currentUser.id);
+      
+      if (targetUserRole && currentUserRole) {
+        const canEdit = Role.canAssignRole(currentUserRole.name, targetUserRole.name);
+        if (!canEdit) {
+          return c.json(
+            apiResponse.forbidden('You cannot edit users with higher roles than your own'),
+            403
+          );
+        }
+      }
+    }
+
     // Prevent admin from changing their own role/status
-    if (userId === currentUser.id && (role_id !== undefined || status !== undefined)) {
+    const isChangingOwnRoleOrStatus = userId === currentUser.id && (
+      (role_id !== undefined && role_id !== userToUpdate.role_id) || 
+      (status !== undefined && status !== userToUpdate.status)
+    );
+    
+    if (isChangingOwnRoleOrStatus) {
       return c.json(
         apiResponse.forbidden('Cannot change your own role or status'),
         403
@@ -273,8 +302,8 @@ users.put('/:id', async (c) => {
     if (name !== undefined) {
       if (!name) {
         errors.name = ['Name is required'];
-      } else if (!security.isValidUsername(name)) {
-        errors.name = ['Invalid name format'];
+      } else if (!security.isValidName(name)) {
+        errors.name = ['Invalid name format (2-50 characters, letters, spaces, hyphens and apostrophes only)'];
       } else {
         updateData.name = security.sanitizeInput(name);
       }
@@ -308,7 +337,13 @@ users.put('/:id', async (c) => {
         if (!roleExists) {
           errors.role_id = ['Invalid role ID'];
         } else {
-          updateData.role_id = role_id;
+          // Check if current user can assign this role
+          const currentUserRole = await User.getRole(currentUser.id);
+          if (currentUserRole && !Role.canAssignRole(currentUserRole.name, roleExists.name)) {
+            errors.role_id = ['You cannot assign a role higher than your own'];
+          } else {
+            updateData.role_id = role_id;
+          }
         }
       } else {
         updateData.role_id = null;
@@ -384,6 +419,132 @@ users.put('/:id', async (c) => {
 });
 
 /**
+ * GET /api/users/:id/permissions - Get user permissions (role + direct)
+ */
+users.get('/:id/permissions', async (c) => {
+  try {
+    const userId = c.req.param('id');
+    
+    if (!userId || typeof userId !== 'string' || userId.length < 10) {
+      return c.json(
+        apiResponse.validation({ id: ['Invalid user ID'] }),
+        400
+      );
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return c.json(
+        apiResponse.error('User not found'),
+        404
+      );
+    }
+
+    // Get all permissions with their source (role or direct)
+    const allPermissions = await User.getPermissions(userId);
+    
+    // Get role permissions separately
+    const rolePermissions = await User.getRolePermissions(userId);
+    const directPermissions = await User.getDirectPermissions(userId);
+    
+    return c.json(
+      apiResponse.success({
+        permissions: allPermissions,
+        rolePermissions: rolePermissions,
+        directPermissions: directPermissions
+      }, 'User permissions retrieved successfully'),
+      200
+    );
+
+  } catch (error) {
+    console.error('Get user permissions error:', error);
+    return c.json(
+      apiResponse.error('Failed to retrieve user permissions'),
+      500
+    );
+  }
+});
+
+/**
+ * PUT /api/users/:id/permissions - Update user direct permissions
+ */
+users.put('/:id/permissions', async (c) => {
+  try {
+    const userId = c.req.param('id');
+    const { permissions = [] } = await c.req.json();
+    
+    if (!userId || typeof userId !== 'string' || userId.length < 10) {
+      return c.json(
+        apiResponse.validation({ id: ['Invalid user ID'] }),
+        400
+      );
+    }
+
+    if (!Array.isArray(permissions)) {
+      return c.json(
+        apiResponse.validation({ permissions: ['Permissions must be an array'] }),
+        400
+      );
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return c.json(
+        apiResponse.error('User not found'),
+        404
+      );
+    }
+
+    // Validate that user cannot have fewer permissions than their role
+    if (user.role_id) {
+      const rolePermissions = await User.getRolePermissions(userId);
+      const rolePermissionIds = rolePermissions.map(p => p.id);
+      
+      // Check if any role permissions are being removed
+      const missingRolePermissions = rolePermissionIds.filter(
+        rolePermId => !permissions.includes(rolePermId)
+      );
+      
+      if (missingRolePermissions.length > 0) {
+        return c.json(
+          apiResponse.validation({
+            permissions: ['Cannot remove permissions that are granted by the user\'s role']
+          }),
+          400
+        );
+      }
+    }
+
+    // Get only the additional permissions (not covered by role)
+    const rolePermissions = await User.getRolePermissions(userId);
+    const rolePermissionIds = rolePermissions.map(p => p.id);
+    const additionalPermissions = permissions.filter(permId => !rolePermissionIds.includes(permId));
+
+    // Sync only the additional permissions
+    await User.syncPermissions(userId, additionalPermissions);
+    
+    // Get updated permissions
+    const updatedPermissions = await User.getPermissions(userId);
+    const directPermissions = await User.getDirectPermissions(userId);
+
+    return c.json(
+      apiResponse.success({
+        permissions: updatedPermissions,
+        directPermissions: directPermissions
+      }, 'User permissions updated successfully'),
+      200
+    );
+
+  } catch (error) {
+    console.error('Update user permissions error:', error);
+    return c.json(
+      apiResponse.error('Failed to update user permissions'),
+      500
+    );
+  }
+});
+
+/**
  * DELETE /api/users/:id - Delete user
  */
 users.delete('/:id', async (c) => {
@@ -412,6 +573,14 @@ users.delete('/:id', async (c) => {
       return c.json(
         apiResponse.error('User not found'),
         404
+      );
+    }
+
+    // Only allow deletion of disabled users
+    if (userToDelete.status !== 'disabled') {
+      return c.json(
+        apiResponse.forbidden('Only disabled users can be deleted. Please disable the user first.'),
+        403
       );
     }
 

@@ -11,6 +11,7 @@
       :placeholder="placeholder"
       :required="required"
       :disabled="disabled"
+      :autocomplete="autocomplete"
       :class="inputClasses"
       @input="$emit('update:modelValue', $event.target.value)"
       @focus="$emit('focus', $event)"
@@ -58,6 +59,10 @@ export default {
       default: ''
     },
     help: {
+      type: String,
+      default: ''
+    },
+    autocomplete: {
       type: String,
       default: ''
     }

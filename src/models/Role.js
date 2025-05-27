@@ -1,4 +1,5 @@
 import { db } from '../db.js';
+import { ROLE_CONFIG } from '../config/roles.js';
 
 export class Role {
     static async findById(id) {
@@ -114,5 +115,27 @@ export class Role {
                 hasPrev: page > 1
             }
         };
+    }
+
+    static async getUserCount(roleId) {
+        const result = await db('users')
+            .where('role_id', roleId)
+            .count('id as count')
+            .first();
+        return result.count;
+    }
+
+    // Use centralized role configuration
+    static getRoleLevel(roleName) {
+        return ROLE_CONFIG.getLevel(roleName);
+    }
+
+    static canAssignRole(currentUserRoleName, targetRoleName) {
+        return ROLE_CONFIG.canAssignRole(currentUserRoleName, targetRoleName);
+    }
+
+    static async getAssignableRoles(currentUserRoleName) {
+        const allRoles = await this.findAll();
+        return ROLE_CONFIG.getAssignableRoles(currentUserRoleName, allRoles);
     }
 }
