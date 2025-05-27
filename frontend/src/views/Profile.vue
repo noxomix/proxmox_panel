@@ -52,10 +52,12 @@
         </div>
 
         <!-- Submit Button -->
-        <RippleEffect :disabled="passwordLoading" color="rgba(255, 255, 255, 0.3)">
+        <RippleEffect :disabled="passwordLoading" color="rgba(255, 255, 255, 0.3)" v-slot="{ createRipple }">
           <button
             type="submit"
             :disabled="passwordLoading"
+            @click="createRipple"
+            @touchstart="createRipple"
             class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-6 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
           >
             <span v-if="passwordLoading" class="flex items-center">
@@ -75,9 +77,10 @@
     <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">API Token</h2>
-        <RippleEffect :disabled="tokenLoading" color="rgba(255, 255, 255, 0.3)">
+        <RippleEffect :disabled="tokenLoading" color="rgba(255, 255, 255, 0.3)" v-slot="{ createRipple }">
           <button
-            @click="generateApiToken"
+            @click="(e) => { createRipple(e); generateApiToken(); }"
+            @touchstart="createRipple"
             :disabled="tokenLoading"
             :class="currentApiToken ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'"
             class="disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-all text-sm"
@@ -123,18 +126,20 @@
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-semibold text-gray-900 dark:text-white">Active Sessions</h2>
         <div class="flex items-center space-x-3">
-          <RippleEffect :disabled="sessionsLoading || sessions.length <= 1" color="rgba(234, 88, 12, 0.3)">
+          <RippleEffect :disabled="sessionsLoading || sessions.length <= 1" color="rgba(234, 88, 12, 0.3)" v-slot="{ createRipple }">
             <button
-              @click="revokeAllSessions"
+              @click="(e) => { createRipple(e); revokeAllSessions(); }"
+              @touchstart="createRipple"
               :disabled="sessionsLoading || sessions.length <= 1"
               class="text-xs px-3 py-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Sign out all other devices
             </button>
           </RippleEffect>
-          <RippleEffect :disabled="sessionsLoading" color="rgba(37, 99, 235, 0.3)">
+          <RippleEffect :disabled="sessionsLoading" color="rgba(37, 99, 235, 0.3)" v-slot="{ createRipple }">
             <button
-              @click="loadSessions"
+              @click="(e) => { createRipple(e); loadSessions(); }"
+              @touchstart="createRipple"
               :disabled="sessionsLoading"
               class="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
             >
@@ -171,9 +176,10 @@
               Expires: {{ formatDate(session.expires_at) }}
             </p>
           </div>
-          <RippleEffect color="rgba(220, 38, 38, 0.3)">
+          <RippleEffect color="rgba(220, 38, 38, 0.3)" v-slot="{ createRipple }">
             <button
-              @click="session.is_current ? handleCurrentSessionLogout() : revokeSession(session.id)"
+              @click="(e) => { createRipple(e); session.is_current ? handleCurrentSessionLogout() : revokeSession(session.id); }"
+              @touchstart="createRipple"
               class="ml-4 text-xs px-2 py-1 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-all"
             >
               Sign out{{ session.is_current ? ' (current)' : '' }}

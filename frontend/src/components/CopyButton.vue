@@ -1,7 +1,8 @@
 <template>
-  <RippleEffect color="rgba(37, 99, 235, 0.3)">
+  <RippleEffect color="rgba(37, 99, 235, 0.3)" v-slot="{ createRipple }">
     <button
-      @click="handleCopy"
+      @click="(e) => { createRipple(e); handleCopy(); }"
+      @touchstart="createRipple"
       class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
     >
       <CopyIcon className="w-4 h-4 mr-1" />

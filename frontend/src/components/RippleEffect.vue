@@ -1,12 +1,5 @@
 <template>
-  <div 
-    ref="rippleContainer" 
-    class="ripple-container" 
-    @click="createRipple"
-    @touchstart="createRipple"
-  >
-    <slot />
-  </div>
+  <slot :createRipple="createRipple" />
 </template>
 
 <script>
@@ -29,11 +22,10 @@ export default {
     }
   },
   setup(props) {
-    const rippleContainer = ref(null)
     const activeRipples = new Set()
 
     const createRipple = (event) => {
-      // Don't create ripple if disabled or if it's a touch event and we already handled click
+      // Don't create ripple if disabled
       if (props.disabled) return
       
       // Prevent double ripples on devices that support both touch and mouse
@@ -41,13 +33,22 @@ export default {
         event.preventDefault()
       }
 
-      const container = rippleContainer.value
-      if (!container) return
+      const target = event.currentTarget
+      if (!target) return
 
-      // Get container bounds
-      const rect = container.getBoundingClientRect()
+      // Ensure the target has proper positioning and overflow
+      const originalPosition = target.style.position
+      const originalOverflow = target.style.overflow
       
-      // Calculate ripple position relative to container
+      if (getComputedStyle(target).position === 'static') {
+        target.style.position = 'relative'
+      }
+      target.style.overflow = 'hidden'
+
+      // Get target bounds
+      const rect = target.getBoundingClientRect()
+      
+      // Calculate ripple position relative to target
       let x, y
       if (event.type === 'touchstart' && event.touches && event.touches[0]) {
         x = event.touches[0].clientX - rect.left
@@ -57,16 +58,12 @@ export default {
         y = event.clientY - rect.top
       }
 
-      // Calculate ripple size (diagonal of container for full coverage)
-      const size = Math.sqrt(rect.width * rect.width + rect.height * rect.height) * 2
+      // Calculate ripple size based on button size for proper containment
+      const size = Math.max(rect.width, rect.height) * 2
 
       // Create ripple element
       const ripple = document.createElement('div')
       ripple.className = 'ripple-wave'
-      
-      // Get the computed border-radius of the container
-      const computedStyle = window.getComputedStyle(container)
-      const borderRadius = computedStyle.borderRadius || '0px'
       
       ripple.style.cssText = `
         position: absolute;
@@ -79,22 +76,37 @@ export default {
         pointer-events: none;
         transform: scale(0);
         opacity: 1;
-        z-index: 1000;
+        z-index: 0;
         animation: ripple-animation ${props.duration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
       `
 
       // Add to active ripples set for cleanup
       activeRipples.add(ripple)
 
-      // Add ripple to container
-      container.appendChild(ripple)
+      // Add ripple to target
+      target.appendChild(ripple)
 
-      // Remove ripple after animation
+      // Remove ripple after animation and restore styles
       setTimeout(() => {
         if (ripple.parentNode) {
           ripple.parentNode.removeChild(ripple)
         }
         activeRipples.delete(ripple)
+        
+        // Restore original styles if no more ripples
+        if (activeRipples.size === 0) {
+          if (originalPosition) {
+            target.style.position = originalPosition
+          } else if (target.style.position === 'relative') {
+            target.style.position = ''
+          }
+          
+          if (originalOverflow) {
+            target.style.overflow = originalOverflow
+          } else {
+            target.style.overflow = ''
+          }
+        }
       }, props.duration)
     }
 
@@ -124,41 +136,8 @@ export default {
               opacity: 0;
             }
           }
-          
-          .ripple-container {
-            position: relative;
-            overflow: hidden;
-            isolation: isolate;
-            display: inline-block;
-          }
-          
-          .ripple-container > * {
-            position: relative;
-            z-index: 1;
-            display: block;
-          }
-          
-          .ripple-wave {
-            position: absolute;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 0;
-          }
         `
         document.head.appendChild(style)
-      }
-      
-      // Copy border-radius from the button to the container
-      const container = rippleContainer.value
-      if (container) {
-        const firstChild = container.children[0]
-        if (firstChild) {
-          const computedStyle = window.getComputedStyle(firstChild)
-          const borderRadius = computedStyle.borderRadius
-          if (borderRadius && borderRadius !== '0px') {
-            container.style.borderRadius = borderRadius
-          }
-        }
       }
     })
 
@@ -167,24 +146,9 @@ export default {
     })
 
     return {
-      rippleContainer,
       createRipple
     }
   }
 }
 </script>
 
-<style scoped>
-.ripple-container {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-  display: inline-block;
-}
-
-.ripple-container > :deep(*) {
-  position: relative;
-  z-index: 1;
-  display: block;
-}
-</style>

@@ -63,10 +63,12 @@
                     </div>
 
                     <!-- Submit Button -->
-                    <RippleEffect :disabled="loading" color="rgba(255, 255, 255, 0.3)">
+                    <RippleEffect :disabled="loading" color="rgba(255, 255, 255, 0.3)" v-slot="{ createRipple }">
                         <button
                             type="submit"
                             :disabled="loading"
+                            @click="createRipple"
+                            @touchstart="createRipple"
                             class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-3 px-4 rounded-lg transition-all transform hover:scale-[1.02] disabled:scale-100 disabled:cursor-not-allowed"
                         >
                             <span
