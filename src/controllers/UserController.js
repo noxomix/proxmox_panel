@@ -12,9 +12,9 @@ const users = new Hono();
 // Apply authentication middleware to all routes
 users.use('*', authMiddleware);
 
-// Apply rate limiting to sensitive operations
+// Apply rate limiting only to sensitive operations
 users.use('/*/delete', strictRateLimit);
-users.use('/', strictRateLimit); // For create operations
+users.post('/', strictRateLimit); // Only for create operations
 
 /**
  * Middleware to check if user has admin privileges

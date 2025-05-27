@@ -8,7 +8,10 @@
       "Bash(mkdir:*)",
       "Bash(NODE_ENV=test npx knex migrate:latest)",
       "Bash(node fix_migrations.js)",
-      "Bash(npm run migrate:*)"
+      "Bash(npm run migrate:*)",
+      "Bash(npm test:*)",
+      "Bash(NODE_ENV=test npm run migrate:rollback)",
+      "Bash(node:*)"
     ],
     "deny": []
   }

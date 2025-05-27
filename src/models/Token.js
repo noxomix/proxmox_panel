@@ -60,9 +60,7 @@ class Token {
   }
 
   static async findByToken(token) {
-    const pepper = process.env.APPLICATION_SECRET || 'fallback-secret';
-    
-    // First check for API tokens (plain text comparison)
+    // Check for API tokens (plain text comparison)
     const apiToken = await db(this.tableName)
       .where('token', token)
       .where('type', 'api')
@@ -73,21 +71,6 @@ class Token {
       return new Token(apiToken);
     }
     
-    // Then check for session tokens (hashed comparison)
-    const sessionTokens = await db(this.tableName)
-      .where('type', 'session')
-      .where('expires_at', '>', new Date())
-      .whereNotNull('token_hash')
-      .select('*');
-
-    for (const tokenData of sessionTokens) {
-      if (tokenData.token_hash) {
-        const isValid = await bcrypt.compare(token + pepper, tokenData.token_hash);
-        if (isValid) {
-          return new Token(tokenData);
-        }
-      }
-    }
     return null;
   }
 

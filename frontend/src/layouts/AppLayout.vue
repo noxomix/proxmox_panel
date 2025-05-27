@@ -45,7 +45,7 @@
           </SidebarLink>
           
           <SidebarLink 
-            :icon="ShieldIcon" 
+            :icon="BriefcaseIcon" 
             :sidebarCollapsed="sidebarCollapsed"
           >
             Security
@@ -160,7 +160,7 @@ import api from '../utils/api.js'
 import ChevronDownIcon from '../components/icons/ChevronDownIcon.vue'
 import UserIcon from '../components/icons/UserIcon.vue'
 import LockIcon from '../components/icons/LockIcon.vue'
-import ShieldIcon from '../components/icons/ShieldIcon.vue'
+import BriefcaseIcon from '../components/icons/BriefcaseIcon.vue'
 import GorillaAvatarIcon from '../components/icons/GiraffeAvatarIcon.vue'
 import DarkModeToggle from '../components/DarkModeToggle.vue'
 import AppLogo from '../components/AppLogo.vue'
@@ -178,7 +178,7 @@ export default {
     ChevronDownIcon,
     UserIcon,
     LockIcon,
-    ShieldIcon,
+    BriefcaseIcon,
     GorillaAvatarIcon,
     DarkModeToggle,
     AppLogo,
@@ -266,7 +266,7 @@ export default {
       toggleSidebar,
       handleLogout,
       UserIcon,
-      ShieldIcon,
+      BriefcaseIcon,
       LockIcon,
       DashboardIcon,
       UsersIcon

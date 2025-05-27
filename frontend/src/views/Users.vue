@@ -12,7 +12,7 @@
 
     <!-- Search and Filters -->
     <div class="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Search Input -->
         <div>
           <label for="search" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -45,29 +45,11 @@
             <option value="blocked">Blocked</option>
           </select>
         </div>
-
-        <!-- Results per page -->
-        <div>
-          <label for="per-page" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Results per page
-          </label>
-          <select
-            id="per-page"
-            v-model="perPage"
-            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-            @change="loadUsers"
-          >
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </div>
       </div>
     </div>
 
     <!-- Users Table -->
-    <div class="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
+    <div class="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
       <!-- Loading State -->
       <div v-if="loading" class="p-8 text-center">
         <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-gray-500 dark:text-gray-400">
@@ -93,11 +75,11 @@
       <!-- Users Table -->
       <div v-else-if="users.length > 0" class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-          <thead class="bg-gray-50 dark:bg-gray-700">
+          <thead class="bg-gray-200 dark:bg-gray-700">
             <tr>
               <th 
                 scope="col" 
-                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
                 @click="sortBy('id')"
               >
                 <div class="flex items-center space-x-1">
@@ -111,7 +93,7 @@
               </th>
               <th 
                 scope="col" 
-                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
                 @click="sortBy('name')"
               >
                 <div class="flex items-center space-x-1">
@@ -125,7 +107,7 @@
               </th>
               <th 
                 scope="col" 
-                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
                 @click="sortBy('email')"
               >
                 <div class="flex items-center space-x-1">
@@ -137,15 +119,15 @@
                   />
                 </div>
               </th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Role
               </th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                 Status
               </th>
               <th 
                 scope="col" 
-                class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600"
+                class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-600"
                 @click="sortBy('created_at')"
               >
                 <div class="flex items-center space-x-1">
@@ -157,51 +139,66 @@
                   />
                 </div>
               </th>
+              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             <tr 
-              v-for="user in users" 
+              v-for="(user, index) in users" 
               :key="user.id"
-              class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150"
+              :class="[
+                'hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150',
+                index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900'
+              ]"
             >
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                {{ user.id }}
+              <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                {{ user.id.slice(0, 8) }}...
               </td>
-              <td class="px-6 py-4 whitespace-nowrap">
+              <td class="px-4 py-3 whitespace-nowrap">
                 <div class="flex items-center">
-                  <UserIcon class="h-8 w-8 text-gray-400 dark:text-gray-500 mr-3" />
+                  <UserIcon :className="'w-6 h-6 text-gray-400 dark:text-gray-500 mr-2'" />
                   <div>
                     <div class="text-sm font-medium text-gray-900 dark:text-white">
                       {{ user.name }}
                     </div>
-                    <div v-if="user.username" class="text-sm text-gray-500 dark:text-gray-400">
-                      @{{ user.username }}
-                    </div>
                   </div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+              <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                 {{ user.email }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span 
-                  :class="{
-                    'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400': user.role === 'admin',
-                    'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400': user.role === 'user'
-                  }"
-                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                >
-                  <ShieldIcon v-if="user.role === 'admin'" class="w-3 h-3 mr-1" />
-                  <UserIcon v-else class="w-3 h-3 mr-1" />
-                  {{ user.role === 'admin' ? 'Admin' : 'User' }}
-                </span>
+              <td class="px-4 py-3 whitespace-nowrap">
+                <RoleBadge :role="user.role" />
               </td>
-              <td class="px-6 py-4 whitespace-nowrap">
+              <td class="px-4 py-3 whitespace-nowrap">
                 <StatusBadge :status="user.status" />
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+              <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                 {{ formatDate(user.created_at) }}
+              </td>
+              <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                <div class="flex items-center space-x-2">
+                  <ActionButton
+                    variant="edit"
+                    title="Edit user"
+                    icon="EditIcon"
+                    @click="editUser(user)"
+                  />
+                  <ActionButton
+                    variant="impersonate"
+                    title="Impersonate user"
+                    icon="ImpersonateIcon"
+                    @click="impersonateUser(user)"
+                  />
+                  <ActionButton
+                    variant="delete"
+                    title="Delete user"
+                    icon="DeleteIcon"
+                    @click="deleteUser(user)"
+                  />
+                </div>
               </td>
             </tr>
           </tbody>
@@ -210,7 +207,7 @@
 
       <!-- Empty State -->
       <div v-else class="p-8 text-center">
-        <UserIcon class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
+        <UserIcon :className="'mx-auto h-12 w-12 text-gray-400 dark:text-gray-500'" />
         <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No users found</h3>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {{ searchQuery ? 'Try adjusting your search criteria.' : 'No users have been created yet.' }}
@@ -218,89 +215,87 @@
       </div>
 
       <!-- Pagination -->
-      <div v-if="pagination && pagination.totalPages > 1" class="bg-white dark:bg-gray-800 px-4 py-3 border-t border-gray-200 dark:border-gray-700 sm:px-6">
+      <div v-if="pagination" class="bg-white dark:bg-gray-800 px-4 py-4 mt-2 border-t border-gray-200 dark:border-gray-700 sm:px-6">
         <div class="flex items-center justify-between">
-          <div class="flex-1 flex justify-between sm:hidden">
+          <!-- Left side: Results info -->
+          <div class="flex items-center space-x-4">
+            <p class="text-sm text-gray-700 dark:text-gray-300">
+              Showing
+              <span class="font-medium">{{ (pagination.page - 1) * pagination.limit + 1 }}</span>
+              to
+              <span class="font-medium">{{ Math.min(pagination.page * pagination.limit, pagination.total) }}</span>
+              of
+              <span class="font-medium">{{ pagination.total }}</span>
+              results
+            </p>
+          </div>
+          
+          <!-- Center: Page navigation -->
+          <div class="flex items-center">
+            <!-- Previous page arrow -->
             <button
               :disabled="!pagination.hasPrev"
               @click="changePage(pagination.page - 1)"
               :class="{
-                'opacity-50 cursor-not-allowed': !pagination.hasPrev,
+                'opacity-40 cursor-not-allowed': !pagination.hasPrev,
                 'hover:bg-gray-50 dark:hover:bg-gray-700': pagination.hasPrev
               }"
-              class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800"
+              class="px-2 py-2 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border-t border-b border-l border-gray-300 dark:border-gray-600 rounded-l-lg transition-colors duration-150"
             >
-              Previous
+              <ChevronDownIcon class="h-4 w-4 transform rotate-90" />
             </button>
+            
+            <!-- Page numbers -->
+            <div class="flex">
+              <template v-for="page in getVisiblePages()" :key="page">
+                <button
+                  v-if="page !== '...'"
+                  @click="changePage(page)"
+                  :class="{
+                    'bg-slate-600 text-white border-slate-600 shadow-sm dark:bg-slate-600 dark:border-slate-600': page === pagination.page,
+                    'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700': page !== pagination.page
+                  }"
+                  class="px-3 py-1.5 text-sm font-medium border-t border-b border-r -ml-px transition-colors duration-150 min-w-[40px]"
+                >
+                  {{ page }}
+                </button>
+                <span v-else class="px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border-t border-b border-r -ml-px">
+                  ...
+                </span>
+              </template>
+            </div>
+            
+            <!-- Next page arrow -->
             <button
               :disabled="!pagination.hasNext"
               @click="changePage(pagination.page + 1)"
               :class="{
-                'opacity-50 cursor-not-allowed': !pagination.hasNext,
+                'opacity-40 cursor-not-allowed': !pagination.hasNext,
                 'hover:bg-gray-50 dark:hover:bg-gray-700': pagination.hasNext
               }"
-              class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800"
+              class="px-2 py-2 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-r-lg -ml-px transition-colors duration-150"
             >
-              Next
+              <ChevronDownIcon class="h-4 w-4 transform -rotate-90" />
             </button>
           </div>
-          <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <div>
-              <p class="text-sm text-gray-700 dark:text-gray-300">
-                Showing
-                <span class="font-medium">{{ (pagination.page - 1) * pagination.limit + 1 }}</span>
-                to
-                <span class="font-medium">{{ Math.min(pagination.page * pagination.limit, pagination.total) }}</span>
-                of
-                <span class="font-medium">{{ pagination.total }}</span>
-                results
-              </p>
-            </div>
-            <div>
-              <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                <button
-                  :disabled="!pagination.hasPrev"
-                  @click="changePage(pagination.page - 1)"
-                  :class="{
-                    'opacity-50 cursor-not-allowed': !pagination.hasPrev,
-                    'hover:bg-gray-50 dark:hover:bg-gray-700': pagination.hasPrev
-                  }"
-                  class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  <ChevronDownIcon class="h-5 w-5 transform rotate-90" />
-                </button>
-                
-                <!-- Page Numbers -->
-                <template v-for="page in getVisiblePages()" :key="page">
-                  <button
-                    v-if="page !== '...'"
-                    @click="changePage(page)"
-                    :class="{
-                      'bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-600 dark:text-blue-400': page === pagination.page,
-                      'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700': page !== pagination.page
-                    }"
-                    class="relative inline-flex items-center px-4 py-2 border text-sm font-medium"
-                  >
-                    {{ page }}
-                  </button>
-                  <span v-else class="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
-                    ...
-                  </span>
-                </template>
-
-                <button
-                  :disabled="!pagination.hasNext"
-                  @click="changePage(pagination.page + 1)"
-                  :class="{
-                    'opacity-50 cursor-not-allowed': !pagination.hasNext,
-                    'hover:bg-gray-50 dark:hover:bg-gray-700': pagination.hasNext
-                  }"
-                  class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400"
-                >
-                  <ChevronDownIcon class="h-5 w-5 transform -rotate-90" />
-                </button>
-              </nav>
-            </div>
+          
+          <!-- Right side: Items per page -->
+          <div class="flex items-center space-x-2">
+            <label for="per-page" class="text-sm text-gray-700 dark:text-gray-300">
+              Show:
+            </label>
+            <select
+              id="per-page"
+              v-model="perPage"
+              class="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              @change="loadUsers"
+            >
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+            <span class="text-sm text-gray-700 dark:text-gray-300">per page</span>
           </div>
         </div>
       </div>
@@ -312,19 +307,27 @@
 import { ref, onMounted, computed } from 'vue';
 import { api } from '../utils/api.js';
 import StatusBadge from '../components/StatusBadge.vue';
+import RoleBadge from '../components/RoleBadge.vue';
 import UserIcon from '../components/icons/UserIcon.vue';
-import ShieldIcon from '../components/icons/ShieldIcon.vue';
 import ChevronDownIcon from '../components/icons/ChevronDownIcon.vue';
 import SpinnerIcon from '../components/icons/SpinnerIcon.vue';
+import EditIcon from '../components/icons/EditIcon.vue';
+import DeleteIcon from '../components/icons/DeleteIcon.vue';
+import ImpersonateIcon from '../components/icons/ImpersonateIcon.vue';
+import ActionButton from '../components/ActionButton.vue';
 
 export default {
   name: 'Users',
   components: {
     StatusBadge,
+    RoleBadge,
     UserIcon,
-    ShieldIcon,
     ChevronDownIcon,
-    SpinnerIcon
+    SpinnerIcon,
+    EditIcon,
+    DeleteIcon,
+    ImpersonateIcon,
+    ActionButton
   },
   setup() {
     const users = ref([]);
@@ -453,6 +456,21 @@ export default {
       });
     };
 
+    const editUser = (user) => {
+      console.log('Edit user:', user);
+      // TODO: Implement edit functionality
+    };
+
+    const deleteUser = (user) => {
+      console.log('Delete user:', user);
+      // TODO: Implement delete functionality
+    };
+
+    const impersonateUser = (user) => {
+      console.log('Impersonate user:', user);
+      // TODO: Implement impersonate functionality
+    };
+
     onMounted(() => {
       loadUsers();
     });
@@ -472,7 +490,10 @@ export default {
       changePage,
       getVisiblePages,
       formatDate,
-      debouncedSearch
+      debouncedSearch,
+      editUser,
+      deleteUser,
+      impersonateUser
     };
   }
 };

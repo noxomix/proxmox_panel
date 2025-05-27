@@ -87,11 +87,10 @@ auth.post('/login', async (c) => {
       const ipAddress = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
       const userAgent = c.req.header('user-agent') || 'unknown';
       
-      // Create session record but store JWT info instead of hash
+      // Create session record with JWT tracking
       const tokenData = {
         user_id: user.id,
         type: 'session',
-        token_hash: null, // No hash needed for JWT
         jwt_id: jwtUtils.decodeToken(jwtToken).jti,
         expires_at: expiresAt,
         ip_address: ipAddress,

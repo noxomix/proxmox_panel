@@ -360,6 +360,13 @@ export const loginRateLimit = async (c, next) => {
   }
 };
 
+// General rate limiter for API endpoints (2 requests per second)
+export const generalRateLimit = createRateLimiter({
+  maxAttempts: 2,
+  windowMs: 1000, // 1 second
+  skipSuccessfulRequests: true // Don't count successful requests
+});
+
 // Aggressive rate limiter for repeated offenders
 export const strictRateLimit = createRateLimiter({
   maxAttempts: 3,
