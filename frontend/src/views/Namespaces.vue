@@ -4,14 +4,10 @@
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-4">
         <!-- View Toggle -->
-        <label class="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            v-model="showAsTree"
-            class="rounded border-gray-300 dark:border-gray-600 text-brand-600 focus:ring-brand-500"
-          />
-          <span class="text-gray-700 dark:text-gray-300">Tree view</span>
-        </label>
+        <div class="flex items-center gap-3">
+          <ToggleSwitch v-model="showAsTree" size="md" />
+          <span class="text-sm font-medium text-gray-600 dark:text-gray-400">Show as Tree</span>
+        </div>
       </div>
       <CreateButton @click="openCreateModal">
         Create Namespace
@@ -33,6 +29,7 @@
               :depth="0"
               @edit="editNamespace"
               @delete="confirmDelete"
+              @create-child="openCreateChildModal"
             />
           </div>
         </div>
@@ -52,10 +49,10 @@
       <template #header>
         <tr>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-            Name
+            Path
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-            Full Path
+            Domain
           </th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
             Depth
@@ -73,14 +70,14 @@
         <tr v-for="namespace in namespaces" :key="namespace.id"
             class="odd:bg-gray-50 odd:dark:bg-gray-700 even:bg-white even:dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-600">
           <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm font-medium text-gray-900 dark:text-white">
-              {{ namespace.name }}
-            </div>
+            <code class="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-700 dark:text-gray-300">
+              <span v-html="formatPathWithBoldName(namespace.full_path)"></span>
+            </code>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
-            <code class="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-700 dark:text-gray-300">
-              {{ namespace.full_path }}
-            </code>
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+              {{ namespace.domain || '-' }}
+            </div>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="text-sm text-gray-500 dark:text-gray-400">
@@ -94,23 +91,34 @@
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-right">
             <div class="flex items-center justify-end gap-2">
-              <ActionButton 
+              <EditResourceButton 
                 v-if="!isRootNamespace(namespace)"
-                variant="edit"
                 title="Edit namespace"
-                icon="EditIcon"
                 @click="editNamespace(namespace)"
               />
-              <ActionButton 
+              <DeleteResourceButton 
                 v-if="!isRootNamespace(namespace)"
-                variant="delete"
                 title="Delete namespace"
-                icon="DeleteIcon"
                 @click="confirmDelete(namespace)"
               />
             </div>
           </td>
         </tr>
+      </template>
+
+      <template #empty>
+        <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div class="text-lg font-medium mb-2">No child namespaces found</div>
+          <div class="text-sm">
+            <button 
+              @click="openCreateModal"
+              class="text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 hover:underline transition-colors cursor-pointer"
+            >
+              Create your first namespace
+            </button> 
+            to organize your resources
+          </div>
+        </div>
       </template>
     </BaseTable>
 
@@ -118,6 +126,7 @@
     <NamespaceModal
       :show="showModal"
       :namespace="selectedNamespace"
+      :selectedParent="selectedParent"
       :namespaces="allNamespaces"
       @close="closeModal"
       @saved="handleSaved"
@@ -168,12 +177,16 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue';
 import { api } from '../utils/api';
+import { currentNamespaceId } from '../stores/namespace';
 import BaseTable from '../components/BaseTable.vue';
 import CreateButton from '../components/CreateButton.vue';
 import ActionButton from '../components/ActionButton.vue';
+import EditResourceButton from '../components/EditResourceButton.vue';
+import DeleteResourceButton from '../components/DeleteResourceButton.vue';
 import ModalInterface from '../components/ModalInterface.vue';
 import NamespaceModal from '../components/NamespaceModal.vue';
 import NamespaceTreeNode from '../components/NamespaceTreeNode.vue';
+import ToggleSwitch from '../components/ToggleSwitch.vue';
 
 // State
 const namespaces = ref([]);
@@ -184,6 +197,7 @@ const error = ref(null);
 const showModal = ref(false);
 const showDeleteModal = ref(false);
 const selectedNamespace = ref(null);
+const selectedParent = ref(null);
 const namespaceToDelete = ref(null);
 const deleting = ref(false);
 const showAsTree = ref(false);
@@ -194,15 +208,38 @@ const fetchNamespaces = async () => {
   error.value = null;
   
   try {
-    // Always fetch flat list
-    const flatResponse = await api.get('/namespaces');
-    allNamespaces.value = flatResponse.data.namespaces || [];
-    namespaces.value = allNamespaces.value;
+    // Fetch filtered namespaces (for display)
+    const filteredResponse = await api.get('/namespaces');
+    namespaces.value = filteredResponse.data.namespaces || [];
     
     // If tree view is enabled, also fetch tree structure
     if (showAsTree.value) {
       const treeResponse = await api.get('/namespaces?tree=true');
       namespaceTree.value = treeResponse.data.namespaces || [];
+    }
+    
+    // Fetch all namespaces for the modal (without X-Namespace filtering)
+    const allResponse = await api.get('/namespaces/list');
+    if (allResponse.success && allResponse.data.namespaces) {
+      // Convert the id => path mapping back to namespace objects for the modal
+      const allNamespaceObjects = [];
+      for (const [id, path] of Object.entries(allResponse.data.namespaces)) {
+        // Find the namespace object from our filtered list or create a minimal one
+        const existing = namespaces.value.find(ns => ns.id === id);
+        if (existing) {
+          allNamespaceObjects.push(existing);
+        } else {
+          // Create minimal namespace object for parent selection
+          allNamespaceObjects.push({
+            id,
+            full_path: path,
+            name: path.split('/').pop(),
+            parent_id: null, // We don't need this for parent selection
+            depth: path.split('/').length - 1
+          });
+        }
+      }
+      allNamespaces.value = allNamespaceObjects;
     }
   } catch (err) {
     error.value = err.message || 'Failed to fetch namespaces';
@@ -213,17 +250,26 @@ const fetchNamespaces = async () => {
 
 const openCreateModal = () => {
   selectedNamespace.value = null;
+  selectedParent.value = null;
+  showModal.value = true;
+};
+
+const openCreateChildModal = (parentNamespace) => {
+  selectedNamespace.value = null;
+  selectedParent.value = parentNamespace;
   showModal.value = true;
 };
 
 const editNamespace = (namespace) => {
   selectedNamespace.value = namespace;
+  selectedParent.value = null;
   showModal.value = true;
 };
 
 const closeModal = () => {
   showModal.value = false;
   selectedNamespace.value = null;
+  selectedParent.value = null;
 };
 
 const handleSaved = async () => {
@@ -255,6 +301,20 @@ const formatDate = (date) => {
   return new Date(date).toLocaleDateString();
 };
 
+const formatPathWithBoldName = (fullPath) => {
+  if (!fullPath) return '';
+  
+  const segments = fullPath.split('/');
+  const lastName = segments.pop(); // Get the last segment (name)
+  const parentPath = segments.join('/'); // Get everything before the last segment
+  
+  if (parentPath) {
+    return `${parentPath}/<strong>${lastName}</strong>`;
+  } else {
+    return `<strong>${lastName}</strong>`;
+  }
+};
+
 const isRootNamespace = (namespace) => {
   return !namespace.parent_id;
 };
@@ -268,6 +328,11 @@ onMounted(() => {
 
 // Watch for view toggle changes
 watch(showAsTree, () => {
+  fetchNamespaces();
+});
+
+// Watch for namespace changes and refresh data
+watch(currentNamespaceId, () => {
   fetchNamespaces();
 });
 </script>

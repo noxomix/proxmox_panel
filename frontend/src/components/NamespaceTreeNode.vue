@@ -6,22 +6,24 @@
         <FolderIcon class="w-5 h-5 text-gray-400 dark:text-gray-500 mr-2" />
       </div>
       <div class="flex-1 min-w-0">
-        <span class="font-medium text-gray-900 dark:text-white">{{ node.name }}</span>
-        <code class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ node.full_path }}</code>
+        <div class="flex items-center gap-2">
+          <span class="font-medium text-gray-900 dark:text-white">{{ node.name }}</span>
+          <span v-if="node.domain" class="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
+            {{ node.domain }}
+          </span>
+        </div>
+        <code class="text-xs text-gray-500 dark:text-gray-400">{{ node.full_path }}</code>
       </div>
       <div class="flex items-center gap-1">
-        <ActionButton 
+        <CreateChildButton @click="$emit('create-child', node)" />
+        <EditResourceButton 
           v-if="!isRootNamespace"
-          variant="edit"
           title="Edit namespace"
-          icon="EditIcon"
           @click="$emit('edit', node)"
         />
-        <ActionButton 
+        <DeleteResourceButton 
           v-if="!isRootNamespace"
-          variant="delete"
           title="Delete namespace"
-          icon="DeleteIcon"
           @click="$emit('delete', node)"
         />
       </div>
@@ -34,6 +36,7 @@
         :depth="depth + 1"
         @edit="$emit('edit', $event)"
         @delete="$emit('delete', $event)"
+        @create-child="$emit('create-child', $event)"
       />
     </div>
   </div>
@@ -42,6 +45,9 @@
 <script setup>
 import { computed } from 'vue';
 import ActionButton from './ActionButton.vue';
+import CreateChildButton from './CreateChildButton.vue';
+import EditResourceButton from './EditResourceButton.vue';
+import DeleteResourceButton from './DeleteResourceButton.vue';
 import FolderIcon from './icons/FolderIcon.vue';
 
 const props = defineProps({
@@ -55,7 +61,7 @@ const props = defineProps({
   }
 });
 
-defineEmits(['edit', 'delete']);
+defineEmits(['edit', 'delete', 'create-child']);
 
 const isRootNamespace = computed(() => {
   return !props.node.parent_id;

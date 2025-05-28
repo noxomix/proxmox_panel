@@ -1,7 +1,7 @@
 <template>
   <ModalInterface
     :show="show"
-    :title="isEditMode ? 'View Namespace' : 'Create Namespace'"
+    :title="modalTitle"
     @close="$emit('close')"
   >
     <form @submit.prevent="handleSubmit" class="space-y-4">
@@ -20,6 +20,23 @@
         />
         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
           Only letters, numbers, hyphens and underscores allowed
+        </p>
+      </div>
+
+      <!-- Domain -->
+      <div>
+        <label for="domain" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Domain
+        </label>
+        <BaseInput
+          id="domain"
+          v-model="form.domain"
+          placeholder="e.g., example.com or sub.domain.com"
+          :error="errors.domain"
+          autocomplete="off"
+        />
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Optional domain or subdomain for this namespace
         </p>
       </div>
 
@@ -57,6 +74,10 @@
         <div class="text-sm">
           <span class="text-gray-600 dark:text-gray-400">Full Path:</span>
           <code class="ml-2 font-mono text-gray-900 dark:text-white">{{ namespace.full_path }}</code>
+        </div>
+        <div class="text-sm" v-if="namespace.domain">
+          <span class="text-gray-600 dark:text-gray-400">Domain:</span>
+          <code class="ml-2 font-mono text-gray-900 dark:text-white">{{ namespace.domain }}</code>
         </div>
         <div class="text-sm">
           <span class="text-gray-600 dark:text-gray-400">Depth:</span>
@@ -100,6 +121,16 @@
         >
           Create Namespace
         </button>
+        
+        <button
+          v-if="isEditMode"
+          type="button"
+          @click="handleSubmit"
+          :disabled="saving"
+          class="px-4 py-2 text-sm font-medium text-white bg-brand-600 border border-transparent rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Update Namespace
+        </button>
       </div>
     </template>
   </ModalInterface>
@@ -108,6 +139,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { api } from '../utils/api';
+import { currentNamespaceId } from '../stores/namespace';
 import ModalInterface from './ModalInterface.vue';
 import BaseInput from './BaseInput.vue';
 
@@ -117,6 +149,10 @@ const props = defineProps({
     required: true
   },
   namespace: {
+    type: Object,
+    default: null
+  },
+  selectedParent: {
     type: Object,
     default: null
   },
@@ -131,6 +167,7 @@ const emit = defineEmits(['close', 'saved']);
 // State
 const form = ref({
   name: '',
+  domain: '',
   parent_id: ''
 });
 const errors = ref({});
@@ -140,19 +177,43 @@ const saving = ref(false);
 // Computed
 const isEditMode = computed(() => !!props.namespace);
 
-const rootNamespace = computed(() => {
-  return props.namespaces.find(ns => !ns.parent_id);
+const modalTitle = computed(() => {
+  if (isEditMode.value) {
+    return 'View Namespace';
+  } else if (props.selectedParent) {
+    return 'Create Sub-Namespace';
+  } else {
+    return 'Create Namespace';
+  }
+});
+
+const currentNamespace = computed(() => {
+  if (!currentNamespaceId.value) return null;
+  return props.namespaces.find(ns => ns.id === currentNamespaceId.value);
 });
 
 const availableParents = computed(() => {
+  let filteredNamespaces = props.namespaces;
+  
   if (isEditMode.value) {
     // In edit mode, exclude self and descendants
-    return props.namespaces.filter(ns => {
+    filteredNamespaces = filteredNamespaces.filter(ns => {
       return ns.id !== props.namespace.id && 
              !ns.full_path.startsWith(props.namespace.full_path + '/');
     });
   }
-  return props.namespaces;
+  
+  // Only show namespaces that are at the current level or below
+  if (currentNamespace.value) {
+    filteredNamespaces = filteredNamespaces.filter(ns => {
+      // Include current namespace itself and its descendants
+      return ns.id === currentNamespace.value.id || 
+             ns.full_path.startsWith(currentNamespace.value.full_path + '/') ||
+             ns.full_path === currentNamespace.value.full_path;
+    });
+  }
+  
+  return filteredNamespaces;
 });
 
 const pathPreview = computed(() => {
@@ -191,6 +252,15 @@ const validateForm = () => {
     return false;
   }
   
+  // Domain validation (optional field)
+  if (form.value.domain && form.value.domain.trim()) {
+    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+    if (!domainRegex.test(form.value.domain.trim())) {
+      errors.value.domain = 'Please enter a valid domain or subdomain';
+      return false;
+    }
+  }
+  
   return true;
 };
 
@@ -202,14 +272,15 @@ const handleSubmit = async () => {
   
   try {
     if (isEditMode.value) {
-      // Update existing namespace
+      // Update existing namespace - only send domain, not name
       await api.patch(`/namespaces/${props.namespace.id}`, {
-        name: form.value.name
+        domain: form.value.domain?.trim() || null
       });
     } else {
       // Create new namespace
       const data = {
         name: form.value.name,
+        domain: form.value.domain?.trim() || null,
         parent_id: form.value.parent_id
       };
       await api.post('/namespaces', data);
@@ -232,13 +303,24 @@ watch(() => props.show, (newVal) => {
     
     if (props.namespace) {
       form.value.name = props.namespace.name;
+      form.value.domain = props.namespace.domain || '';
       form.value.parent_id = props.namespace.parent_id || '';
     } else {
       // Reset form for new namespace
       form.value.name = '';
-      // Set root namespace as default parent
-      if (rootNamespace.value) {
-        form.value.parent_id = rootNamespace.value.id;
+      form.value.domain = '';
+      
+      // Use selectedParent if provided, otherwise use current namespace
+      if (props.selectedParent) {
+        form.value.parent_id = props.selectedParent.id;
+      } else if (currentNamespace.value) {
+        form.value.parent_id = currentNamespace.value.id;
+      } else {
+        // Fallback to first available namespace
+        const firstAvailable = availableParents.value[0];
+        if (firstAvailable) {
+          form.value.parent_id = firstAvailable.id;
+        }
       }
     }
   }
