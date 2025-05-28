@@ -31,7 +31,13 @@
       "Bash(NODE_OPTIONS='--experimental-vm-modules' npx jest tests/auth-debug.test.js --runInBand)",
       "Bash(NODE_OPTIONS='--experimental-vm-modules' npx jest tests/users.test.js --runInBand --testNamePattern=\"should list users based on permissions\")",
       "Bash(ls:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(ss:*)",
+      "Bash(sudo fuser:*)",
+      "Bash(pkill:*)",
+      "Bash(kill:*)",
+      "Bash(bun run:*)",
+      "Bash(bun test:*)"
     ],
     "deny": []
   }

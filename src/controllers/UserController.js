@@ -583,8 +583,16 @@ users.put('/:id/permissions', requirePermission('user_permissions_edit'), async 
       );
     }
 
-    // Check if current user can manage target user (permission superset)
+    // Check if user is trying to edit their own permissions
     const { user: currentUser } = getAuthData(c);
+    if (currentUser.id === userId) {
+      return c.json(
+        apiResponse.forbidden('You cannot edit your own permissions'),
+        403
+      );
+    }
+
+    // Check if current user can manage target user (permission superset)
     const canManage = await PermissionHelper.canManageUser(currentUser.id, userId);
     if (!canManage) {
       return c.json(

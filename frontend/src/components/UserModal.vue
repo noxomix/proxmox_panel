@@ -256,6 +256,7 @@ export default {
     const isEditing = computed(() => !!props.user);
 
     const currentUser = ref(null);
+    const currentUserPermissions = ref([]);
     const canAssignRoles = ref(false);
     const canViewUserPermissions = ref(false);
     const canEditUserPermissions = ref(false);
@@ -282,6 +283,19 @@ export default {
       const categories = [...new Set(permissions.value.map(p => p.category).filter(Boolean))];
       return categories.sort();
     });
+
+    const isPermissionAvailable = (permissionId) => {
+      // If editing self, all permissions are disabled
+      if (isEditingSelf.value) return false;
+      
+      // If current user permissions not loaded yet, allow everything (to avoid blocking UI)
+      if (!currentUserPermissions.value || currentUserPermissions.value.length === 0) {
+        return true;
+      }
+      
+      // Check if current user has this permission
+      return currentUserPermissions.value.some(p => p.id === permissionId);
+    };
 
     const getPermissionsByCategory = (category) => {
       if (category === null || category === undefined) {
@@ -359,6 +373,20 @@ export default {
         }
       } catch (error) {
         console.error('Failed to load roles:', error);
+      }
+    };
+
+    const loadCurrentUserPermissions = async () => {
+      if (!currentUser.value?.id) return;
+      
+      try {
+        const response = await api.get(`/users/${currentUser.value.id}/permissions`);
+        if (response.success) {
+          currentUserPermissions.value = response.data.permissions || [];
+        }
+      } catch (error) {
+        console.error('Failed to load current user permissions:', error);
+        currentUserPermissions.value = [];
       }
     };
 
@@ -508,8 +536,8 @@ export default {
         }
 
         if (response.success) {
-          // Update permissions if editing
-          if (isEditing.value) {
+          // Update permissions if editing (but not yourself)
+          if (isEditing.value && !isEditingSelf.value) {
             // Only send direct permissions (exclude role permissions)
             const directPermissionIds = Object.keys(selectedPermissions.value)
               .filter(id => {
@@ -528,7 +556,7 @@ export default {
             if (!permissionsResponse.success) {
               console.error('Failed to update permissions:', permissionsResponse);
             }
-          } else if (Object.values(selectedPermissions.value).some(v => v)) {
+          } else if (!isEditing.value && Object.values(selectedPermissions.value).some(v => v)) {
             // Set permissions for new user if any are selected
             const permissionIds = Object.keys(selectedPermissions.value)
               .filter(id => selectedPermissions.value[id]);
@@ -643,6 +671,7 @@ export default {
     onMounted(async () => {
       if (props.show) {
         await Promise.all([loadPermissions(), loadRoles(), loadCurrentUser()]);
+        await loadCurrentUserPermissions();
         populateForm();
       }
     });
@@ -669,6 +698,7 @@ export default {
       getPermissionsByCategory,
       isPermissionFromRole,
       updatePermission,
+      isPermissionAvailable,
       handleClose,
       handleSubmit
     };

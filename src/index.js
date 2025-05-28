@@ -86,24 +86,11 @@ if (process.env.NODE_ENV === 'production') {
 
 const port = process.env.PORT || 3000;
 
-console.log(`🚀 Server läuft auf http://localhost:${port}`);
-
+// Export for Bun's native server
 export default {
   port,
   fetch: app.fetch,
 };
-
-// Start the server only if not in test environment
-if (process.env.NODE_ENV !== 'test' && import.meta.url === `file://${process.argv[1]}`) {
-  const { serve } = await import('@hono/node-server');
-  
-  serve({
-    fetch: app.fetch,
-    port,
-  });
-  
-  console.log(`🚀 Server läuft auf http://localhost:${port}`);
-}
 
 // Export app for testing
 export { app };
