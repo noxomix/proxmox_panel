@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { apiResponse } from '../utils/response.js';
 import { authMiddleware } from '../middleware/auth.js';

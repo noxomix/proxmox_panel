@@ -1,6 +1,6 @@
 import db from '../db.js';
 import crypto from 'crypto';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 class Token {
   constructor(data) {

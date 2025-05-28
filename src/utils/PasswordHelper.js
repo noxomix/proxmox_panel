@@ -1,7 +1,7 @@
 /**
  * Password hashing and validation utilities
  */
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { security } from './security.js';
 
 export class PasswordHelper {

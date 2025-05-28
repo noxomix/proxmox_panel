@@ -1,6 +1,6 @@
-import { beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { beforeAll, afterAll, beforeEach } from 'bun:test';
 import dotenv from 'dotenv';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { db } from '../src/db.js';
 import { jwtUtils } from '../src/utils/jwt.js';
 

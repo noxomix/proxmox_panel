@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import User from '../../models/User.js';
 import Token from '../../models/Token.js';
