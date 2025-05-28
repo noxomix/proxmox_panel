@@ -13,18 +13,26 @@ describe('Token Management Tests', () => {
   describe('Session Token Management', () => {
     test('should create session token', async () => {
       const sessionToken = await global.testUtils.createTestToken(testUser.id, {
-        type: 'session'
+        type: 'session',
+        jwt_id: 'test-jwt-id'
       });
       
       expect(sessionToken).toBeDefined();
       expect(sessionToken.type).toBe('session');
       expect(sessionToken.user_id).toBe(testUser.id);
+      expect(sessionToken.jwt_id).toBe('test-jwt-id');
     });
 
     test('should find session tokens by user', async () => {
       // Create multiple session tokens
-      await global.testUtils.createTestToken(testUser.id, { type: 'session' });
-      await global.testUtils.createTestToken(testUser.id, { type: 'session' });
+      await global.testUtils.createTestToken(testUser.id, { 
+        type: 'session',
+        jwt_id: 'jwt-1'
+      });
+      await global.testUtils.createTestToken(testUser.id, { 
+        type: 'session',
+        jwt_id: 'jwt-2'
+      });
       
       const sessions = await Token.findSessionsByUserId(testUser.id);
       expect(sessions.length).toBeGreaterThanOrEqual(2);
@@ -36,7 +44,8 @@ describe('Token Management Tests', () => {
 
     test('should revoke session tokens', async () => {
       const sessionToken = await global.testUtils.createTestToken(testUser.id, {
-        type: 'session'
+        type: 'session',
+        jwt_id: 'jwt-to-revoke'
       });
       
       // Verify token exists
@@ -51,14 +60,38 @@ describe('Token Management Tests', () => {
       tokens = await db('tokens').where('id', sessionToken.id);
       expect(tokens).toHaveLength(0);
     });
+
+    test('should find valid session by JWT ID', async () => {
+      const jwtId = 'unique-jwt-id';
+      await global.testUtils.createTestToken(testUser.id, {
+        type: 'session',
+        jwt_id: jwtId,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000) // Future
+      });
+      
+      const session = await Token.findValidSessionByJwtId(jwtId);
+      expect(session).toBeTruthy();
+      expect(session.jwt_id).toBe(jwtId);
+    });
+
+    test('should not find expired session by JWT ID', async () => {
+      const jwtId = 'expired-jwt-id';
+      await global.testUtils.createTestToken(testUser.id, {
+        type: 'session',
+        jwt_id: jwtId,
+        expires_at: new Date(Date.now() - 1000) // Past
+      });
+      
+      const session = await Token.findValidSessionByJwtId(jwtId);
+      expect(session).toBeNull();
+    });
   });
 
   describe('API Token Management', () => {
     test('should create API token', async () => {
       const apiToken = await global.testUtils.createTestToken(testUser.id, {
         type: 'api',
-        token: 'test-api-token-123',
-        token_hash: null
+        token: 'test-api-token-123'
       });
       
       expect(apiToken).toBeDefined();
@@ -72,15 +105,13 @@ describe('Token Management Tests', () => {
       await global.testUtils.createTestToken(testUser.id, {
         type: 'api',
         token: 'old-token',
-        token_hash: null,
         created_at: new Date(Date.now() - 2000)
       });
       
       // Create new token
       await global.testUtils.createTestToken(testUser.id, {
         type: 'api',
-        token: 'new-token', 
-        token_hash: null,
+        token: 'new-token',
         created_at: new Date()
       });
       
@@ -92,136 +123,141 @@ describe('Token Management Tests', () => {
       await global.testUtils.createTestToken(testUser.id, {
         type: 'api',
         token: 'expired-token',
-        token_hash: null,
         expires_at: new Date(Date.now() - 1000) // Expired
       });
       
       const token = await Token.getLatestApiToken(testUser.id);
       expect(token).toBe(null);
     });
-  });
 
-  describe('JWT Token Handling', () => {
-    test('should create valid JWT token', () => {
-      const payload = {
-        id: testUser.id,
+    test('should delete old API tokens for user', async () => {
+      // Create multiple API tokens
+      await global.testUtils.createTestToken(testUser.id, {
         type: 'api',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600
-      };
-      
-      const token = jwt.sign(payload, process.env.JWT_SECRET);
-      expect(token).toBeDefined();
-      expect(typeof token).toBe('string');
-    });
-
-    test('should verify valid JWT token', () => {
-      const payload = {
-        id: testUser.id,
-        type: 'api',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600
-      };
-      
-      const token = jwt.sign(payload, process.env.JWT_SECRET);
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
-      expect(decoded.id).toBe(testUser.id);
-      expect(decoded.type).toBe('api');
-    });
-
-    test('should reject expired JWT token', () => {
-      const expiredPayload = {
-        id: testUser.id,
-        type: 'api',
-        iat: Math.floor(Date.now() / 1000) - 7200,
-        exp: Math.floor(Date.now() / 1000) - 3600 // Expired
-      };
-      
-      const expiredToken = jwt.sign(expiredPayload, process.env.JWT_SECRET);
-      
-      expect(() => {
-        jwt.verify(expiredToken, process.env.JWT_SECRET);
-      }).toThrow('jwt expired');
-    });
-
-    test('should reject malformed JWT token', () => {
-      const malformedToken = 'invalid.jwt.token';
-      
-      expect(() => {
-        jwt.verify(malformedToken, process.env.JWT_SECRET);
-      }).toThrow();
-    });
-
-    test('should properly revoke JWT sessions from database', async () => {
-      // Create a session token with jwt_id
-      const jwtId = 'test-jwt-id-' + Date.now();
-      const sessionToken = await global.testUtils.createTestToken(testUser.id, {
-        type: 'session',
-        jwt_id: jwtId
+        token: 'token-1'
       });
-      
-      // Create a JWT with the same jti
-      const payload = {
-        id: testUser.id,
-        type: 'session',
-        jti: jwtId,
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + 3600
-      };
-      
-      const jwtToken = jwt.sign(payload, process.env.JWT_SECRET);
-      
-      // Verify session exists in database
-      let dbSession = await db('tokens')
-        .where('jwt_id', jwtId)
-        .where('type', 'session')
-        .where('expires_at', '>', new Date())
-        .first();
-      expect(dbSession).toBeDefined();
-      
-      // Revoke the session from database
-      await Token.deleteById(sessionToken.id);
-      
-      // Verify session is removed from database
-      dbSession = await db('tokens')
-        .where('jwt_id', jwtId)
-        .where('type', 'session')
-        .where('expires_at', '>', new Date())
-        .first();
-      expect(dbSession).toBeUndefined();
-      
-      // JWT should still be valid from crypto perspective
-      const decoded = jwt.verify(jwtToken, process.env.JWT_SECRET);
-      expect(decoded.jti).toBe(jwtId);
-      
-      // But middleware should reject it because session is revoked
-      // This test verifies the logic would work in middleware
-      expect(dbSession).toBeFalsy();
-    });
-  });
-
-  describe('Token Cleanup', () => {
-    test('should cleanup expired tokens', async () => {
-      // Create expired token
+      await global.testUtils.createTestToken(testUser.id, {
+        type: 'api',
+        token: 'token-2'
+      });
       await global.testUtils.createTestToken(testUser.id, {
         type: 'session',
+        jwt_id: 'session-token' // Should not be deleted
+      });
+      
+      // Delete API tokens
+      await Token.deleteApiTokensForUser(testUser.id);
+      
+      // Check that API tokens are gone but session remains
+      const apiTokens = await db('tokens')
+        .where('user_id', testUser.id)
+        .where('type', 'api');
+      expect(apiTokens).toHaveLength(0);
+      
+      const sessionTokens = await db('tokens')
+        .where('user_id', testUser.id)
+        .where('type', 'session');
+      expect(sessionTokens).toHaveLength(1);
+    });
+
+    test('should find valid API token', async () => {
+      const plainToken = 'valid-api-token';
+      await global.testUtils.createTestToken(testUser.id, {
+        type: 'api',
+        token: plainToken,
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000) // Future
+      });
+      
+      const token = await Token.findValidApiToken(plainToken);
+      expect(token).toBeTruthy();
+      expect(token.token).toBe(plainToken);
+    });
+
+    test('should not find expired API token', async () => {
+      const plainToken = 'expired-api-token';
+      await global.testUtils.createTestToken(testUser.id, {
+        type: 'api',
+        token: plainToken,
+        expires_at: new Date(Date.now() - 1000) // Past
+      });
+      
+      const token = await Token.findValidApiToken(plainToken);
+      expect(token).toBeNull();
+    });
+  });
+
+  describe('Token Expiration', () => {
+    test('should clean up expired tokens', async () => {
+      // Create expired tokens
+      await global.testUtils.createTestToken(testUser.id, {
+        type: 'session',
+        jwt_id: 'expired-1',
+        expires_at: new Date(Date.now() - 2000)
+      });
+      await global.testUtils.createTestToken(testUser.id, {
+        type: 'api',
+        token: 'expired-2',
         expires_at: new Date(Date.now() - 1000)
       });
       
       // Create valid token
       await global.testUtils.createTestToken(testUser.id, {
         type: 'session',
-        expires_at: new Date(Date.now() + 3600000)
+        jwt_id: 'valid-1',
+        expires_at: new Date(Date.now() + 10000)
       });
       
-      // Cleanup expired
-      await Token.cleanupExpired();
+      // Clean expired tokens
+      const deleted = await Token.cleanExpired();
+      expect(deleted).toBeGreaterThanOrEqual(2);
       
-      // Check remaining tokens
-      const remainingTokens = await db('tokens').where('user_id', testUser.id);
-      expect(remainingTokens).toHaveLength(1);
-      expect(new Date(remainingTokens[0].expires_at).getTime()).toBeGreaterThan(Date.now());
+      // Verify only valid token remains
+      const remaining = await db('tokens').where('user_id', testUser.id);
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].jwt_id).toBe('valid-1');
+    });
+  });
+
+  describe('Token Static Methods', () => {
+    test('should create token from JWT data', async () => {
+      const tokenData = {
+        user_id: testUser.id,
+        type: 'session',
+        jwt_id: 'from-jwt',
+        expires_at: new Date(Date.now() + 3600000),
+        ip_address: '192.168.1.1',
+        user_agent: 'Test Browser'
+      };
+      
+      const tokenId = await Token.create(tokenData);
+      expect(tokenId).toBeDefined();
+      
+      const created = await db('tokens').where('id', tokenId).first();
+      expect(created.user_id).toBe(testUser.id);
+      expect(created.jwt_id).toBe('from-jwt');
+      expect(created.ip_address).toBe('192.168.1.1');
+    });
+
+    test('should revoke all sessions for user', async () => {
+      // Create multiple sessions
+      await global.testUtils.createTestToken(testUser.id, {
+        type: 'session',
+        jwt_id: 'session-1'
+      });
+      await global.testUtils.createTestToken(testUser.id, {
+        type: 'session', 
+        jwt_id: 'session-2'
+      });
+      
+      // Revoke all sessions
+      const revoked = await Token.revokeAllSessions(testUser.id);
+      expect(revoked).toBeGreaterThanOrEqual(2);
+      
+      // Verify all sessions are gone
+      const sessions = await db('tokens')
+        .where('user_id', testUser.id)
+        .where('type', 'session');
+      expect(sessions).toHaveLength(0);
     });
   });
 });

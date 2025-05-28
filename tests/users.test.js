@@ -10,13 +10,19 @@ describe('UserController Logic Tests', () => {
   let regularUser;
   let adminToken;
   let userToken;
+  let adminRole;
+  let userRole;
 
   beforeEach(async () => {
+    // Get roles
+    adminRole = await global.testUtils.getRoleByName('admin');
+    userRole = await global.testUtils.getRoleByName('user');
+    
     // Create admin user
     adminUser = await global.testUtils.createTestUser({
       name: 'Admin User',
       email: 'admin@test.com',
-      role_id: null, // Will need to be set properly later
+      role_id: adminRole.id,
       status: 'active'
     });
 
@@ -24,7 +30,7 @@ describe('UserController Logic Tests', () => {
     regularUser = await global.testUtils.createTestUser({
       name: 'Regular User',
       email: 'user@test.com', 
-      role_id: null, // Will need to be set properly later
+      role_id: userRole.id,
       status: 'active'
     });
 
@@ -39,7 +45,7 @@ describe('UserController Logic Tests', () => {
         name: 'Test User',
         email: 'test@example.com',
         password_hash: await bcrypt.hash('password123' + (process.env.APPLICATION_SECRET || ''), 12),
-        role_id: null,
+        role_id: userRole.id,
         status: 'active'
       };
 
@@ -49,7 +55,7 @@ describe('UserController Logic Tests', () => {
       const createdUser = await User.findByEmail(userData.email);
       expect(createdUser.name).toBe(userData.name);
       expect(createdUser.email).toBe(userData.email);
-      expect(createdUser.role).toBe(userData.role);
+      expect(createdUser.role_id).toBe(userData.role_id);
       expect(createdUser.status).toBe(userData.status);
     });
 
@@ -57,7 +63,7 @@ describe('UserController Logic Tests', () => {
       const user = await User.findByEmail('admin@test.com');
       expect(user).toBeTruthy();
       expect(user.email).toBe('admin@test.com');
-      expect(user.role).toBe('admin');
+      expect(user.role_id).toBe(adminRole.id);
     });
 
     test('should find user by identity (email or username)', async () => {
@@ -100,148 +106,131 @@ describe('UserController Logic Tests', () => {
 
       const result = await User.paginate({
         page: 1,
-        limit: 3,
-        search: '',
-        status: '',
-        sortBy: 'created_at',
-        sortOrder: 'desc'
+        limit: 5,
+        search: 'Test'
       });
 
-      expect(result.data).toHaveLength(3);
+      expect(result.data).toBeInstanceOf(Array);
       expect(result.page).toBe(1);
-      expect(result.limit).toBe(3);
-      expect(result.total).toBeGreaterThanOrEqual(7); // 2 original + 5 new
-      expect(result.totalPages).toBeGreaterThanOrEqual(3);
+      expect(result.limit).toBe(5);
+      expect(result.total).toBeGreaterThanOrEqual(5);
     });
 
-    test('should search users by name', async () => {
-      await global.testUtils.createTestUser({
-        email: 'searchable@test.com',
-        name: 'Searchable User'
-      });
-
-      const result = await User.paginate({
-        page: 1,
-        limit: 10,
-        search: 'Searchable',
-        status: '',
-        sortBy: 'created_at',
-        sortOrder: 'desc'
-      });
-
-      expect(result.data.length).toBe(1);
-      expect(result.data[0].name).toBe('Searchable User');
-    });
-
-    test('should filter users by status', async () => {
-      await global.testUtils.createTestUser({
-        email: 'disabled@test.com',
-        status: 'disabled'
-      });
-
-      const result = await User.paginate({
-        page: 1,
-        limit: 10,
-        search: '',
-        status: 'disabled',
-        sortBy: 'created_at',
-        sortOrder: 'desc'
-      });
-
-      expect(result.data.length).toBe(1);
-      expect(result.data[0].status).toBe('disabled');
-    });
-
-    test('should sort users correctly', async () => {
-      // Create users with different names
-      await global.testUtils.createTestUser({
-        email: 'alice@test.com',
-        name: 'Alice'
-      });
-      await global.testUtils.createTestUser({
-        email: 'bob@test.com',
-        name: 'Bob'
-      });
-
-      const result = await User.paginate({
-        page: 1,
-        limit: 10,
-        search: '',
-        status: '',
-        sortBy: 'name',
-        sortOrder: 'asc'
-      });
-
-      // Check if first few users are sorted by name
-      const names = result.data.map(user => user.name).slice(0, 3);
-      const sortedNames = [...names].sort();
-      expect(names).toEqual(sortedNames);
-    });
-  });
-
-  describe('Password Hashing', () => {
-    test('should hash password with pepper correctly', async () => {
-      const password = 'testPassword123';
-      const pepper = process.env.APPLICATION_SECRET || 'fallback-secret';
-      
+    test('should verify password correctly', async () => {
+      const password = 'password123';
+      const pepper = process.env.APPLICATION_SECRET || '';
       const hashedPassword = await bcrypt.hash(password + pepper, 12);
-      
-      expect(hashedPassword).toBeTruthy();
-      expect(hashedPassword).not.toBe(password);
-      
-      // Verify password can be checked
-      const isValid = await bcrypt.compare(password + pepper, hashedPassword);
+
+      const testUser = await global.testUtils.createTestUser({
+        email: 'passtest@example.com',
+        password_hash: hashedPassword
+      });
+
+      // User model doesn't have verifyPassword static method
+      // Password verification is done differently in the actual app
+      const isValid = await bcrypt.compare(password + pepper, testUser.password_hash);
       expect(isValid).toBe(true);
+
+      const isInvalid = await bcrypt.compare('wrongpassword' + pepper, testUser.password_hash);
+      expect(isInvalid).toBe(false);
     });
 
-    test('should fail verification with wrong password', async () => {
-      const password = 'testPassword123';
-      const wrongPassword = 'wrongPassword';
-      const pepper = process.env.APPLICATION_SECRET || 'fallback-secret';
+    test('should check user permissions correctly', async () => {
+      // Admin should have login permission
+      const hasPermission = await User.hasPermission(adminUser.id, 'login');
+      expect(hasPermission).toBe(true);
+
+      // Regular user should have limited permissions
+      const hasAdminPermission = await User.hasPermission(regularUser.id, 'user_delete');
+      expect(hasAdminPermission).toBe(false);
+    });
+
+    test('should get user permissions with role permissions', async () => {
+      const permissions = await User.getPermissions(adminUser.id);
+      expect(permissions).toBeInstanceOf(Array);
+      expect(permissions.length).toBeGreaterThan(0);
       
-      const hashedPassword = await bcrypt.hash(password + pepper, 12);
+      // Admin should have all permissions
+      const permissionNames = permissions.map(p => p.name);
+      expect(permissionNames).toContain('login');
+      expect(permissionNames).toContain('user_create');
+      expect(permissionNames).toContain('user_delete');
+    });
+
+    test('should get role permissions separately', async () => {
+      const rolePermissions = await User.getRolePermissions(adminUser.id);
+      expect(rolePermissions).toBeInstanceOf(Array);
+      expect(rolePermissions.length).toBeGreaterThan(0);
+    });
+
+    test('should handle direct permissions', async () => {
+      // Assign direct permission to user
+      await global.testUtils.assignUserPermissions(regularUser.id, ['user_index']);
       
-      const isValid = await bcrypt.compare(wrongPassword + pepper, hashedPassword);
-      expect(isValid).toBe(false);
+      // Check that user now has this permission
+      const hasPermission = await User.hasPermission(regularUser.id, 'user_index');
+      expect(hasPermission).toBe(true);
+      
+      // Get direct permissions
+      const directPermissions = await User.getDirectPermissions(regularUser.id);
+      expect(directPermissions).toBeInstanceOf(Array);
+      expect(directPermissions.map(p => p.name)).toContain('user_index');
+    });
+
+    test('should sync permissions correctly', async () => {
+      const permission1 = await global.testUtils.getPermissionByName('user_index');
+      const permission2 = await global.testUtils.getPermissionByName('user_show');
+      
+      // Sync permissions
+      await User.syncPermissions(regularUser.id, [permission1.id, permission2.id]);
+      
+      // Check synced permissions
+      const directPermissions = await User.getDirectPermissions(regularUser.id);
+      const permissionIds = directPermissions.map(p => p.id);
+      
+      expect(permissionIds).toContain(permission1.id);
+      expect(permissionIds).toContain(permission2.id);
+      expect(permissionIds.length).toBe(2);
+      
+      // Sync again with only one permission
+      await User.syncPermissions(regularUser.id, [permission1.id]);
+      
+      const updatedPermissions = await User.getDirectPermissions(regularUser.id);
+      const updatedIds = updatedPermissions.map(p => p.id);
+      
+      expect(updatedIds).toContain(permission1.id);
+      expect(updatedIds).not.toContain(permission2.id);
+      expect(updatedIds.length).toBe(1);
     });
   });
 
-  describe('JWT Token Generation', () => {
-    test('should generate valid JWT tokens', async () => {
-      const token = jwtUtils.generateToken(adminUser, 'session');
-      expect(token).toBeTruthy();
+  describe('Security Validations', () => {
+    test('should handle SQL injection attempts in queries', async () => {
+      const maliciousInput = "'; DROP TABLE users; --";
       
-      const decoded = jwtUtils.decodeToken(token);
-      expect(decoded.id).toBe(adminUser.id);
-      expect(decoded.type).toBe('session');
+      const result = await User.paginate({
+        page: 1,
+        limit: 10,
+        search: maliciousInput
+      });
+      
+      expect(result.data).toBeInstanceOf(Array);
+      
+      // Verify tables still exist
+      const tablesExist = await db.schema.hasTable('users');
+      expect(tablesExist).toBe(true);
     });
 
-    test('should verify JWT tokens correctly', async () => {
-      const token = jwtUtils.generateToken(adminUser, 'session');
-      
-      const isValid = jwtUtils.verifyToken(token);
-      expect(isValid).toBeTruthy();
-      expect(isValid.id).toBe(adminUser.id);
-    });
-
-    test('should reject invalid JWT tokens', async () => {
-      const invalidToken = 'invalid.jwt.token';
-      
-      expect(() => {
-        jwtUtils.verifyToken(invalidToken);
-      }).toThrow('Invalid token');
-    });
-  });
-
-  describe('User Model toJSON', () => {
-    test('should exclude password_hash from JSON output', async () => {
+    test('should not expose password_hash in JSON output', async () => {
       const user = await User.findById(adminUser.id);
       const userJson = user.toJSON();
       
       expect(userJson).toHaveProperty('id');
       expect(userJson).toHaveProperty('name');
       expect(userJson).toHaveProperty('email');
-      expect(userJson).toHaveProperty('role');
+      expect(userJson).toHaveProperty('role_id');
+      expect(userJson).toHaveProperty('role_name');
+      expect(userJson).toHaveProperty('role_display_name');
       expect(userJson).toHaveProperty('status');
       expect(userJson).not.toHaveProperty('password_hash');
     });

@@ -68,16 +68,15 @@
           </label>
           <select
             v-model="form.role_id"
-            :disabled="isEditingSelf"
+            :disabled="isEditingSelf || !canAssignRoles || roleDropdownDisabled"
             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:bg-gray-700 dark:text-white transition-colors"
             :class="[
               errors.role_id ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : '',
-              isEditingSelf ? 'opacity-60 cursor-not-allowed' : ''
+              (isEditingSelf || !canAssignRoles || roleDropdownDisabled) ? 'opacity-60 cursor-not-allowed' : ''
             ]"
           >
-            <option value="">No role assigned</option>
             <option v-for="role in roles" :key="role.id" :value="role.id">
-              {{ role.display_name }}
+              {{ role.display_name || role.name }}
             </option>
           </select>
           <p v-if="errors.role_id" class="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -116,13 +115,19 @@
         
         <div v-if="form.role_id" class="mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p class="text-sm text-blue-800 dark:text-blue-200">
-            <strong>{{ selectedRoleName }}:</strong> Some permissions are inherited from the selected role and cannot be removed. You can only add additional permissions.
+            <strong>{{ selectedRoleName }} Role:</strong> Some permissions are inherited from the selected role and cannot be removed. You can only add additional permissions.
           </p>
         </div>
         
         <div v-if="isEditingSelf" class="mb-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
           <p class="text-sm text-amber-800 dark:text-amber-200">
             <strong>Note:</strong> You cannot modify your own permissions. Contact an administrator if you need permission changes.
+          </p>
+        </div>
+        
+        <div v-if="!canEditUserPermissions && !isEditingSelf" class="mb-3 p-3 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg">
+          <p class="text-sm text-gray-800 dark:text-gray-200">
+            <strong>Read-only:</strong> You can view permissions but cannot modify them. Contact an administrator if you need permission management access.
           </p>
         </div>
         
@@ -142,8 +147,8 @@
                 @update:modelValue="(value) => updatePermission(permission.id, value)"
                 :label="permission.display_name"
                 :help="permission.description"
-                :disabled="isPermissionFromRole(permission.id) || isEditingSelf"
-                :class="(isPermissionFromRole(permission.id) || isEditingSelf) ? 'opacity-60' : ''"
+                :disabled="isPermissionFromRole(permission.id) || isEditingSelf || !canEditUserPermissions"
+                :class="(isPermissionFromRole(permission.id) || isEditingSelf || !canEditUserPermissions) ? 'opacity-60' : ''"
               />
             </div>
           </div>
@@ -163,8 +168,8 @@
                 @update:modelValue="(value) => updatePermission(permission.id, value)"
                 :label="permission.display_name"
                 :help="permission.description"
-                :disabled="isPermissionFromRole(permission.id) || isEditingSelf"
-                :class="(isPermissionFromRole(permission.id) || isEditingSelf) ? 'opacity-60' : ''"
+                :disabled="isPermissionFromRole(permission.id) || isEditingSelf || !canEditUserPermissions"
+                :class="(isPermissionFromRole(permission.id) || isEditingSelf || !canEditUserPermissions) ? 'opacity-60' : ''"
               />
             </div>
           </div>
@@ -245,6 +250,12 @@ export default {
     const isEditing = computed(() => !!props.user);
 
     const currentUser = ref(null);
+    const canAssignRoles = ref(false);
+    const canViewUserPermissions = ref(false);
+    const canEditUserPermissions = ref(false);
+    const roleDropdownDisabled = ref(false);
+    const permissionCheckResult = ref(null);
+    
     const isEditingSelf = computed(() => {
       return isEditing.value && currentUser.value && props.user?.id === currentUser.value.id;
     });
@@ -267,6 +278,9 @@ export default {
     });
 
     const getPermissionsByCategory = (category) => {
+      if (category === null || category === undefined) {
+        return permissions.value.filter(p => !p.category || p.category === '');
+      }
       return permissions.value.filter(p => p.category === category);
     };
 
@@ -293,9 +307,9 @@ export default {
 
     const loadPermissions = async () => {
       try {
-        const response = await api.get('/permissions');
+        const response = await api.get('/permissions/all');
         if (response.success) {
-          permissions.value = response.data.data;
+          permissions.value = response.data || [];
           
           // Initialize selectedPermissions
           const selected = {};
@@ -326,6 +340,21 @@ export default {
         }
       } catch (error) {
         console.error('Failed to load roles:', error);
+      }
+    };
+
+    const checkUserEditPermissions = async () => {
+      if (!isEditing.value || !props.user?.id) return;
+      
+      try {
+        const response = await api.get(`/users/${props.user.id}/can-edit`);
+        if (response.success) {
+          permissionCheckResult.value = response.data;
+          roleDropdownDisabled.value = response.data.has_more_permissions;
+        }
+      } catch (error) {
+        console.error('Failed to check user edit permissions:', error);
+        roleDropdownDisabled.value = false;
       }
     };
 
@@ -496,8 +525,31 @@ export default {
     };
 
     // Watch for role changes to update permissions
-    watch(() => form.value.role_id, async (newRoleId) => {
+    watch(() => form.value.role_id, async (newRoleId, oldRoleId) => {
+      if (!newRoleId || newRoleId === oldRoleId) return;
+      
+      // When role changes, preserve only non-role permissions
+      const preservedPermissions = {};
+      
+      // If editing existing user, preserve their direct permissions
+      if (isEditing.value) {
+        Object.keys(selectedPermissions.value).forEach(permId => {
+          // Keep permission if it was selected AND not from the old role
+          if (selectedPermissions.value[permId] && !rolePermissions.value[permId]) {
+            preservedPermissions[permId] = true;
+          }
+        });
+      }
+      
+      // Load new role permissions
       await loadRolePermissions(newRoleId);
+      
+      // Merge preserved permissions with new role permissions
+      const newSelected = { ...selectedPermissions.value };
+      Object.keys(preservedPermissions).forEach(permId => {
+        newSelected[permId] = true;
+      });
+      selectedPermissions.value = newSelected;
     });
 
     const loadCurrentUser = async () => {
@@ -505,6 +557,20 @@ export default {
         const response = await api.get('/auth/profile');
         if (response.success) {
           currentUser.value = response.data.user;
+          
+          // Check if user has role assignment permission
+          const permissionsResponse = await api.get(`/users/${response.data.user.id}/permissions`);
+          if (permissionsResponse.success) {
+            canAssignRoles.value = permissionsResponse.data.permissions.some(
+              p => p.name === 'user_role_assign'
+            );
+            canViewUserPermissions.value = permissionsResponse.data.permissions.some(
+              p => p.name === 'user_permissions_view'
+            );
+            canEditUserPermissions.value = permissionsResponse.data.permissions.some(
+              p => p.name === 'user_permissions_edit'
+            );
+          }
         }
       } catch (error) {
         console.error('Failed to load current user:', error);
@@ -518,12 +584,14 @@ export default {
         populateForm();
         
         if (user?.id && isEditing.value) {
-          await loadUserPermissions();
+          await Promise.all([loadUserPermissions(), checkUserEditPermissions()]);
         } else if (form.value.role_id) {
           await loadRolePermissions(form.value.role_id);
         }
       } else {
         resetForm();
+        roleDropdownDisabled.value = false;
+        permissionCheckResult.value = null;
       }
     }, { immediate: true, deep: true });
 
@@ -546,6 +614,11 @@ export default {
       isEditing,
       isFormValid,
       isEditingSelf,
+      canAssignRoles,
+      canViewUserPermissions,
+      canEditUserPermissions,
+      roleDropdownDisabled,
+      permissionCheckResult,
       selectedRoleName,
       permissionCategories,
       getPermissionsByCategory,

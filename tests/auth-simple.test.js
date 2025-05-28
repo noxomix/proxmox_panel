@@ -1,7 +1,5 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { db } from '../src/db.js';
+import db from '../src/db.js';
 import Token from '../src/models/Token.js';
 
 describe('Token Model - Regenerate with Delete Logic', () => {
@@ -17,8 +15,7 @@ describe('Token Model - Regenerate with Delete Logic', () => {
       // Create initial API token
       const firstToken = await global.testUtils.createTestToken(testUser.id, {
         type: 'api',
-        token: 'first-api-token-123',
-        token_hash: null
+        token: 'first-api-token-123'
       });
 
       // Verify first token exists
@@ -29,13 +26,12 @@ describe('Token Model - Regenerate with Delete Logic', () => {
       expect(apiTokens[0].token).toBe('first-api-token-123');
 
       // Delete existing API tokens (simulate regeneration)
-      await Token.deleteApiTokensByUserId(testUser.id);
+      await Token.deleteApiTokensForUser(testUser.id);
 
       // Create new API token
       const secondToken = await global.testUtils.createTestToken(testUser.id, {
         type: 'api',
-        token: 'second-api-token-456',
-        token_hash: null
+        token: 'second-api-token-456'
       });
 
       // Verify only the new token exists
@@ -54,13 +50,12 @@ describe('Token Model - Regenerate with Delete Logic', () => {
       // Generate 5 tokens in sequence, each time deleting old ones
       for (let i = 0; i < 5; i++) {
         // Delete existing API tokens
-        await Token.deleteApiTokensByUserId(testUser.id);
+        await Token.deleteApiTokensForUser(testUser.id);
         
         // Create new token
         const token = await global.testUtils.createTestToken(testUser.id, {
           type: 'api',
-          token: `api-token-${i}`,
-          token_hash: null
+          token: `api-token-${i}`
         });
         
         tokens.push(token);
@@ -95,8 +90,7 @@ describe('Token Model - Regenerate with Delete Logic', () => {
       // Create API token
       const apiToken = await global.testUtils.createTestToken(testUser.id, {
         type: 'api',
-        token: 'api-token-123',
-        token_hash: null
+        token: 'api-token-123'
       });
 
       // Delete API tokens
@@ -138,14 +132,12 @@ describe('Token Model - Regenerate with Delete Logic', () => {
       // Create API tokens for both users
       const userToken = await global.testUtils.createTestToken(testUser.id, {
         type: 'api',
-        token: 'user-token',
-        token_hash: null
+        token: 'user-token'
       });
 
       const otherUserToken = await global.testUtils.createTestToken(otherUser.id, {
         type: 'api',
-        token: 'other-user-token',
-        token_hash: null
+        token: 'other-user-token'
       });
 
       // Delete API tokens for first user only

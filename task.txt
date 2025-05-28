@@ -1,0 +1,59 @@
+# Ziel
+Ein dynamisches Rollen- und Berechtigungssystem zur Verwaltung von Nutzern. Keine festen Rollen. Jeder Nutzer hat genau eine Rolle und kann zusätzlich direkte Berechtigungen besitzen.
+
+# Grundregeln
+
+- Jeder Nutzer hat exakt **eine Rolle**
+- Rollen bestehen aus einer beliebigen Menge von Berechtigungen
+- Zusätzlich kann ein Nutzer **direkte Permissions** besitzen
+- Effektive Rechte = Rolle + direkte Permissions
+
+# Selbstbearbeitung
+
+Ein Nutzer darf:
+- seinen eigenen **Namen**
+- seine eigene **E-Mail**
+- sein eigenes **Passwort**
+ändern.
+
+Ein Nutzer darf **nicht**:
+- seine eigene Rolle ändern
+- seine eigenen direkten Permissions ändern
+- seinen eigenen Aktiv-Status ändern
+
+# Bearbeitung anderer Nutzer
+
+Ein Nutzer darf andere Nutzer **nur dann bearbeiten**, wenn diese **weniger effektive Rechte** besitzen als er selbst.  
+Das bedeutet:
+
+effectivePermissions(target) ⊂ effectivePermissions(current)
+
+
+## Passwort anderer Nutzer
+- Niemals bearbeitbar
+
+## Name / E-Mail anderer Nutzer
+- Nur bearbeitbar, wenn das Rechte-Verhältnis wie oben erfüllt ist
+
+## Rolle zuweisen
+- Nur Rollen zuweisbar, deren effektive Berechtigungen eine **echte Teilmenge** der eigenen effektiven Berechtigungen sind
+- Es darf **nicht** die eigene Rolle sein
+- Es darf **nicht** eine Rolle mit exakt denselben Rechten sein
+
+## Direkte Permissions zuweisen
+- Nur Permissions zuweisbar, die man selbst besitzt
+- Nach der Zuweisung darf der Zielnutzer **nicht dieselben effektiven Berechtigungen** haben wie man selbst
+- Es muss **mindestens eine Permission weniger** sein
+
+# Sicherheitsprinzipien
+
+- **Verglichen wird immer mit effektiven Berechtigungen**, also Rolle + direkte Rechte
+- **Kein Gleichstand erlaubt** bei Permissions-Menge
+- **Keine Sonderrollen oder feste Namen** (z. B. kein „admin“)
+- Alle Prüfungen erfolgen auf Basis von Mengenvergleichen
+
+# Ziel
+Ein System, das:
+- dynamisch mit beliebigen Rollen und Rechten funktioniert
+- keine Privilegieneskalation erlaubt
+- eindeutige Regeln für Selbst- und Fremdbearbeitung besitzt

@@ -6,25 +6,20 @@ import { apiResponse } from '../utils/response.js';
 import { security } from '../utils/security.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
+import { PermissionHelper } from '../utils/permissionHelper.js';
 
 const roleController = new Hono();
 
 roleController.use('*', authMiddleware);
-roleController.use('*', requirePermission('role_manage'));
 
 /**
- * GET /api/roles/assignable - Get roles that current user can assign
+ * GET /api/roles/assignable - Get roles that current user can assign to others
+ * Different from general list - only returns roles with permission subset logic
  */
-roleController.get('/assignable', async (c) => {
+roleController.get('/assignable', requirePermission('user_role_assign'), async (c) => {
     try {
         const currentUser = c.get('user');
-        const userRole = await User.getRole(currentUser.id);
-        
-        if (!userRole) {
-            return c.json(apiResponse.error('User has no role assigned'), 403);
-        }
-
-        const assignableRoles = await Role.getAssignableRoles(userRole.name);
+        const assignableRoles = await PermissionHelper.getAssignableRoles(currentUser.id);
         
         return c.json(
             apiResponse.success({ roles: assignableRoles }, 'Assignable roles retrieved successfully'),
@@ -36,7 +31,7 @@ roleController.get('/assignable', async (c) => {
     }
 });
 
-roleController.get('/', async (c) => {
+roleController.get('/', requirePermission('roles_list'), async (c) => {
     try {
         const page = Math.max(1, parseInt(c.req.query('page')) || 1);
         const limit = Math.min(50, Math.max(1, parseInt(c.req.query('limit')) || 10));
@@ -57,7 +52,7 @@ roleController.get('/', async (c) => {
     }
 });
 
-roleController.get('/:id', async (c) => {
+roleController.get('/:id', requirePermission('roles_list'), async (c) => {
     try {
         const id = c.req.param('id');
         
@@ -82,7 +77,7 @@ roleController.get('/:id', async (c) => {
     }
 });
 
-roleController.post('/', async (c) => {
+roleController.post('/', requirePermission('roles_create'), async (c) => {
     try {
         const { name, display_name, description, permissions } = await c.req.json();
 
@@ -138,7 +133,7 @@ roleController.post('/', async (c) => {
     }
 });
 
-roleController.put('/:id', async (c) => {
+roleController.put('/:id', requirePermission('roles_edit'), async (c) => {
     try {
         const id = c.req.param('id');
         const { name, display_name, description, permissions } = await c.req.json();
@@ -235,7 +230,7 @@ roleController.put('/:id', async (c) => {
     }
 });
 
-roleController.delete('/:id', async (c) => {
+roleController.delete('/:id', requirePermission('roles_delete'), async (c) => {
     try {
         const id = c.req.param('id');
 

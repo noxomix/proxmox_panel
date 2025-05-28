@@ -11,9 +11,12 @@ if (!JWT_SECRET || JWT_SECRET === 'your-secret-key-change-this-in-production') {
   }
 }
 
-// Use a more secure fallback only for development
-const FALLBACK_SECRET = process.env.NODE_ENV === 'production' ? null : 'dev-only-fallback-secret-not-for-production';
-const SECRET = JWT_SECRET || FALLBACK_SECRET;
+// In production, no fallback is allowed
+if (process.env.NODE_ENV === 'production' && !JWT_SECRET) {
+  throw new Error('JWT_SECRET is required in production environment');
+}
+
+const SECRET = JWT_SECRET || 'dev-only-fallback-secret-not-for-production';
 
 export const jwtUtils = {
   // Generate JWT token for user

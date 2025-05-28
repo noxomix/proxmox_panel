@@ -36,31 +36,37 @@ const attemptStore = new Map(); // In production, use Redis
 const globalStore = new Map(); // Global rate limiting store
 const userAttemptStore = new Map(); // Per-user attempt tracking
 
-// Cleanup old entries periodically
-setInterval(() => {
+// Cleanup old entries periodically with proper TTL cleanup
+const cleanupStore = (store, windowMs, storeName) => {
   const now = Date.now();
+  let cleanedCount = 0;
   
-  // Cleanup IP-based attempts
-  for (const [key, data] of attemptStore.entries()) {
-    if (now - data.firstAttempt > RATE_LIMIT_CONFIG.IP_WINDOW_MS) {
-      attemptStore.delete(key);
+  for (const [key, data] of store.entries()) {
+    if (now - data.firstAttempt > windowMs) {
+      store.delete(key);
+      cleanedCount++;
     }
   }
   
-  // Cleanup global attempts
-  for (const [key, data] of globalStore.entries()) {
-    if (now - data.firstAttempt > RATE_LIMIT_CONFIG.GLOBAL_WINDOW_MS) {
-      globalStore.delete(key);
-    }
+  if (cleanedCount > 0) {
+    console.log(`🧹 Cleaned ${cleanedCount} expired entries from ${storeName} store`);
   }
-  
-  // Cleanup user-specific attempts
-  for (const [key, data] of userAttemptStore.entries()) {
-    if (now - data.firstAttempt > RATE_LIMIT_CONFIG.USER_WINDOW_MS) {
-      userAttemptStore.delete(key);
-    }
-  }
+};
+
+const cleanupInterval = setInterval(() => {
+  cleanupStore(attemptStore, RATE_LIMIT_CONFIG.IP_WINDOW_MS, 'IP');
+  cleanupStore(globalStore, RATE_LIMIT_CONFIG.GLOBAL_WINDOW_MS, 'global');
+  cleanupStore(userAttemptStore, RATE_LIMIT_CONFIG.USER_WINDOW_MS, 'user');
 }, RATE_LIMIT_CONFIG.CLEANUP_INTERVAL_MS);
+
+// Graceful shutdown cleanup
+process.on('SIGTERM', () => {
+  clearInterval(cleanupInterval);
+});
+
+process.on('SIGINT', () => {
+  clearInterval(cleanupInterval);
+});
 
 /**
  * Global rate limiter to prevent distributed botnet attacks

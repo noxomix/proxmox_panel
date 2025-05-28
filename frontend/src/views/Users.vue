@@ -173,7 +173,7 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
             <div class="flex items-center space-x-2">
               <ActionButton
-                v-if="canEditUser(user)"
+                v-if="user.can_edit"
                 variant="edit"
                 title="Edit user"
                 icon="EditIcon"
@@ -461,15 +461,8 @@ export default {
       return roleHierarchy[roleName] || 999;
     };
 
-    const canEditUser = (user) => {
-      if (!currentUser.value || !currentUser.value.role_name) return false;
-      
-      // Can't edit users with higher or equal roles
-      const currentUserLevel = getRoleLevel(currentUser.value.role_name);
-      const targetUserLevel = getRoleLevel(user.role_name);
-      
-      return currentUserLevel < targetUserLevel; // Changed from <= to < (strictly lower)
-    };
+    // can_edit is now provided by the API for each user
+    // Remove old client-side role hierarchy logic
 
     const formatDate = (dateString) => {
       const date = new Date(dateString);
@@ -540,7 +533,6 @@ export default {
       clearFilters,
       closeModal,
       handleUserSaved,
-      canEditUser,
       editUser,
       deleteUser,
       impersonateUser,

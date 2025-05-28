@@ -8,9 +8,8 @@ import { requirePermission } from '../middleware/permissions.js';
 const permissionController = new Hono();
 
 permissionController.use('*', authMiddleware);
-permissionController.use('*', requirePermission('permission_manage'));
 
-permissionController.get('/', async (c) => {
+permissionController.get('/', requirePermission('permissions_list'), async (c) => {
     try {
         const page = Math.max(1, parseInt(c.req.query('page')) || 1);
         const limit = Math.min(50, Math.max(1, parseInt(c.req.query('limit')) || 10));
@@ -25,7 +24,7 @@ permissionController.get('/', async (c) => {
     }
 });
 
-permissionController.get('/categories', async (c) => {
+permissionController.get('/categories', requirePermission('permissions_list'), async (c) => {
     try {
         const categories = await Permission.getCategories();
         return c.json(apiResponse.success(categories, 'Categories retrieved successfully'));
@@ -35,7 +34,19 @@ permissionController.get('/categories', async (c) => {
     }
 });
 
-permissionController.get('/:id', async (c) => {
+// Get all permissions without pagination (for dropdowns/forms)
+// IMPORTANT: This must be before /:id route
+permissionController.get('/all', requirePermission('permissions_list'), async (c) => {
+    try {
+        const permissions = await Permission.findAll();
+        return c.json(apiResponse.success(permissions, 'All permissions retrieved successfully'));
+    } catch (error) {
+        console.error('Get all permissions error:', error);
+        return c.json(apiResponse.error('Failed to retrieve permissions'), 500);
+    }
+});
+
+permissionController.get('/:id', requirePermission('permissions_list'), async (c) => {
     try {
         const id = c.req.param('id');
         
@@ -55,7 +66,7 @@ permissionController.get('/:id', async (c) => {
     }
 });
 
-permissionController.post('/', async (c) => {
+permissionController.post('/', requirePermission('permissions_create'), async (c) => {
     try {
         const { name, display_name, description, category } = await c.req.json();
 
@@ -92,7 +103,7 @@ permissionController.post('/', async (c) => {
     }
 });
 
-permissionController.delete('/:id', async (c) => {
+permissionController.delete('/:id', requirePermission('permissions_delete'), async (c) => {
     try {
         const id = c.req.param('id');
 

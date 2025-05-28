@@ -244,9 +244,9 @@ All interactive elements (buttons, links, form focus states) should use the bran
 
 ##### 2. User Management Rules
 - **Edit Restriction**: Can only edit users with **strictly lower** roles
-- **Delete Restriction**: Can only delete **disabled** users with lower roles
+- **Self-Edit Permission**: Can always edit own profile (name, email, password)
 - **Self-Edit Restriction**: Cannot change own role or status
-- **Profile Edit**: Can always edit own name, email, password
+- **Delete Restriction**: Can only delete **disabled** users with lower roles
 
 ##### 3. Permission System Rules
 - **Role Permissions**: Inherited automatically, cannot be removed
@@ -260,11 +260,12 @@ All interactive elements (buttons, links, form focus states) should use the bran
 - **Role Deletion**: Only possible if no users are assigned to that role
 - **System Roles**: Cannot be deleted or have names modified
 - **Permission Assignment**: Can only assign permissions the creator has
+- **Role Assignment**: Requires `user_role_assign` permission + role hierarchy validation
 
 #### Permission Categories & Examples
 ```
 User Management:
-- user_view, user_create, user_manage, user_delete
+- user_view, user_create, user_manage, user_delete, user_role_assign
 
 Role Management:
 - role_view, role_create, role_manage, role_delete

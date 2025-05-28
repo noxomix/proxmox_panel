@@ -22,7 +22,11 @@
       "Bash(NODE_ENV=test npx knex migrate:rollback --all)",
       "Bash(find:*)",
       "Bash(sed:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(tar:*)",
+      "Bash(mv:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }

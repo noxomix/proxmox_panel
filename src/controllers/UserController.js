@@ -7,6 +7,8 @@ import { requirePermission } from '../middleware/permissions.js';
 import { getAuthData } from '../utils/authHelper.js';
 import { security } from '../utils/security.js';
 import { strictRateLimit } from '../middleware/rateLimiter.js';
+import { PermissionHelper } from '../utils/permissionHelper.js';
+import db from '../db.js';
 
 const users = new Hono();
 
@@ -18,10 +20,10 @@ users.use('/*/delete', strictRateLimit);
 users.post('/', strictRateLimit); // Only for create operations
 
 // Apply permission checks to specific routes
-users.get('/', requirePermission('user_manage'));
-users.get('/:id', requirePermission('user_manage'));
+users.get('/', requirePermission('user_index'));
+users.get('/:id', requirePermission('user_show'));
 users.post('/', requirePermission('user_create'));
-users.put('/:id', requirePermission('user_manage'));
+users.put('/:id', requirePermission('user_update'));
 users.delete('/:id', requirePermission('user_delete'));
 
 /**
@@ -68,9 +70,25 @@ users.get('/', async (c) => {
       sortOrder
     });
 
+    // Add can_edit field for each user
+    const currentUser = c.get('user');
+    const usersWithCanEdit = await Promise.all(
+      result.data.map(async (user) => {
+        // Allow profile editing for self, admin editing for others based on permissions
+        const canEditProfile = currentUser.id === user.id;
+        const canEditOthers = currentUser.id !== user.id ? 
+          await PermissionHelper.canManageUser(currentUser.id, user.id) : false;
+        
+        return {
+          ...user.toJSON(),
+          can_edit: canEditProfile || canEditOthers
+        };
+      })
+    );
+
     return c.json(
       apiResponse.success({
-        users: result.data.map(user => user.toJSON()),
+        users: usersWithCanEdit,
         pagination: {
           page: result.page,
           limit: result.limit,
@@ -162,8 +180,10 @@ users.post('/', async (c) => {
       }
     }
 
-    // Validate role_id
-    if (role_id) {
+    // Validate role_id - role is required
+    if (!role_id) {
+      errors.role_id = ['Role is required'];
+    } else {
       const Role = (await import('../models/Role.js')).Role;
       const roleExists = await Role.findById(role_id);
       if (!roleExists) {
@@ -171,9 +191,17 @@ users.post('/', async (c) => {
       } else {
         // Check if current user can assign this role
         const { user: currentUser } = getAuthData(c);
-        const currentUserRole = await User.getRole(currentUser.id);
-        if (currentUserRole && !Role.canAssignRole(currentUserRole.name, roleExists.name)) {
-          errors.role_id = ['You cannot assign a role higher than your own'];
+        
+        // Check permission first
+        const canAssignRoles = await User.hasPermission(currentUser.id, 'user_role_assign');
+        if (!canAssignRoles) {
+          errors.role_id = ['You do not have permission to assign user roles'];
+        } else {
+          // Check if user can assign this role based on permissions
+          const canAssign = await PermissionHelper.canAssignRole(currentUser.id, role_id);
+          if (!canAssign) {
+            errors.role_id = ['You cannot assign a role with permissions you do not have'];
+          }
         }
       }
     }
@@ -212,16 +240,28 @@ users.post('/', async (c) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password + pepper, saltRounds);
 
-    // Create user
-    const userData = {
-      name: security.sanitizeInput(name),
-      email: security.sanitizeInput(email.toLowerCase()),
-      password_hash: hashedPassword,
-      role_id,
-      status
-    };
+    // Create user with atomic transaction
+    const userId = await db.transaction(async (trx) => {
+      const userData = {
+        name: security.sanitizeInput(name),
+        email: security.sanitizeInput(email.toLowerCase()),
+        password_hash: hashedPassword,
+        role_id,
+        status
+      };
 
-    const userId = await User.create(userData);
+      // Create user within transaction
+      const [newUserId] = await trx('users').insert(userData);
+      
+      // Verify user was created successfully
+      const createdUser = await trx('users').where('id', newUserId).first();
+      if (!createdUser) {
+        throw new Error('Failed to create user');
+      }
+      
+      return newUserId;
+    });
+    
     const newUser = await User.findById(userId);
 
     return c.json(
@@ -265,34 +305,29 @@ users.put('/:id', async (c) => {
       );
     }
 
-    // Check if current user can edit this user (based on role hierarchy)
-    if (userToUpdate.role_id) {
-      const Role = (await import('../models/Role.js')).Role;
-      const targetUserRole = await Role.findById(userToUpdate.role_id);
-      const currentUserRole = await User.getRole(currentUser.id);
-      
-      if (targetUserRole && currentUserRole) {
-        const canEdit = Role.canAssignRole(currentUserRole.name, targetUserRole.name);
-        if (!canEdit) {
-          return c.json(
-            apiResponse.forbidden('You cannot edit users with higher roles than your own'),
-            403
-          );
-        }
-      }
-    }
+    // Determine if this is a profile edit (only name, email, password) or admin edit (role/status)
+    const isAdminEdit = role_id !== undefined || status !== undefined;
+    const isProfileEdit = !isAdminEdit;
+    const isSelfEdit = userId === currentUser.id;
 
-    // Prevent admin from changing their own role/status
-    const isChangingOwnRoleOrStatus = userId === currentUser.id && (
-      (role_id !== undefined && role_id !== userToUpdate.role_id) || 
-      (status !== undefined && status !== userToUpdate.status)
-    );
-    
-    if (isChangingOwnRoleOrStatus) {
+    // Check permissions based on edit type
+    if (isSelfEdit && isAdminEdit) {
+      // Block self role/status changes
       return c.json(
         apiResponse.forbidden('Cannot change your own role or status'),
         403
       );
+    }
+    
+    if (!isSelfEdit) {
+      // For editing other users, check permission superset
+      const canManage = await PermissionHelper.canManageUser(currentUser.id, userId);
+      if (!canManage) {
+        return c.json(
+          apiResponse.forbidden('You cannot edit users with more permissions than your own'),
+          403
+        );
+      }
     }
 
     const errors = {};
@@ -337,16 +372,30 @@ users.put('/:id', async (c) => {
         if (!roleExists) {
           errors.role_id = ['Invalid role ID'];
         } else {
-          // Check if current user can assign this role
-          const currentUserRole = await User.getRole(currentUser.id);
-          if (currentUserRole && !Role.canAssignRole(currentUserRole.name, roleExists.name)) {
-            errors.role_id = ['You cannot assign a role higher than your own'];
+          // Check if current user can assign this role (skip for self-edit keeping same role)
+          const isSelfEditSameRole = userId === currentUser.id && role_id === userToUpdate.role_id;
+          
+          if (!isSelfEditSameRole) {
+            // Check if user has permission to assign roles
+            const canAssignRoles = await User.hasPermission(currentUser.id, 'user_role_assign');
+            if (!canAssignRoles) {
+              errors.role_id = ['You do not have permission to assign user roles'];
+            } else {
+              // Check if user can assign this role based on permissions
+              const canAssign = await PermissionHelper.canAssignRole(currentUser.id, role_id);
+              if (!canAssign) {
+                errors.role_id = ['You cannot assign a role with permissions you do not have'];
+              } else {
+                updateData.role_id = role_id;
+              }
+            }
           } else {
+            // Self-edit with same role - no validation needed
             updateData.role_id = role_id;
           }
         }
       } else {
-        updateData.role_id = null;
+        errors.role_id = ['Role is required - cannot remove role'];
       }
     }
 
@@ -420,8 +469,9 @@ users.put('/:id', async (c) => {
 
 /**
  * GET /api/users/:id/permissions - Get user permissions (role + direct)
+ * Requires user_permissions_view permission + hierarchical validation
  */
-users.get('/:id/permissions', async (c) => {
+users.get('/:id/permissions', requirePermission('user_permissions_view'), async (c) => {
   try {
     const userId = c.req.param('id');
     
@@ -437,6 +487,16 @@ users.get('/:id/permissions', async (c) => {
       return c.json(
         apiResponse.error('User not found'),
         404
+      );
+    }
+
+    // Check if current user can manage target user (permission superset)
+    const { user: currentUser } = getAuthData(c);
+    const canManage = await PermissionHelper.canManageUser(currentUser.id, userId);
+    if (!canManage) {
+      return c.json(
+        apiResponse.forbidden('You cannot view permissions of users with more permissions than your own'),
+        403
       );
     }
 
@@ -467,8 +527,9 @@ users.get('/:id/permissions', async (c) => {
 
 /**
  * PUT /api/users/:id/permissions - Update user direct permissions
+ * Requires user_permissions_edit permission + hierarchical validation
  */
-users.put('/:id/permissions', async (c) => {
+users.put('/:id/permissions', requirePermission('user_permissions_edit'), async (c) => {
   try {
     const userId = c.req.param('id');
     const { permissions = [] } = await c.req.json();
@@ -492,6 +553,27 @@ users.put('/:id/permissions', async (c) => {
       return c.json(
         apiResponse.error('User not found'),
         404
+      );
+    }
+
+    // Check if current user can manage target user (permission superset)
+    const { user: currentUser } = getAuthData(c);
+    const canManage = await PermissionHelper.canManageUser(currentUser.id, userId);
+    if (!canManage) {
+      return c.json(
+        apiResponse.forbidden('You cannot edit permissions of users with more permissions than your own'),
+        403
+      );
+    }
+
+    // Validate permission assignment
+    const validation = await PermissionHelper.validatePermissionAssignment(currentUser.id, permissions);
+    if (!validation.valid) {
+      return c.json(
+        apiResponse.validation({
+          permissions: [validation.message]
+        }),
+        403
       );
     }
 
@@ -599,6 +681,53 @@ users.delete('/:id', async (c) => {
     console.error('Delete user error:', error);
     return c.json(
       apiResponse.error('Failed to delete user'),
+      500
+    );
+  }
+});
+
+/**
+ * GET /api/users/:id/can-edit - Check if current user can edit target user
+ * Used for modal permission validation
+ */
+users.get('/:id/can-edit', requirePermission('user_permissions_view'), async (c) => {
+  try {
+    const targetUserId = c.req.param('id');
+    const currentUser = c.get('user');
+
+    if (!security.validateInput(targetUserId, 'uuid')) {
+      return c.json(apiResponse.error('Invalid user ID'), 400);
+    }
+
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      return c.json(apiResponse.error('User not found'), 404);
+    }
+
+    // Check if current user can manage target user
+    const isSelf = currentUser.id === targetUserId;
+    const canEdit = isSelf || await PermissionHelper.canManageUser(currentUser.id, targetUserId);
+    
+    // Check if target user has more permissions (for role dropdown disabling)
+    // For self-edit, always disable role dropdown (can't change own role)
+    const hasMorePermissions = isSelf || !await PermissionHelper.canManageUser(currentUser.id, targetUserId);
+    const currentUserPermissions = await User.getPermissions(currentUser.id);
+    const targetUserPermissions = await User.getPermissions(targetUserId);
+    
+    return c.json(
+      apiResponse.success({
+        can_edit: canEdit,
+        has_more_permissions: hasMorePermissions,
+        current_user_permission_count: currentUserPermissions.length,
+        target_user_permission_count: targetUserPermissions.length
+      }, 'Permission check completed'),
+      200
+    );
+
+  } catch (error) {
+    console.error('Check user edit permission error:', error);
+    return c.json(
+      apiResponse.error('Failed to check edit permissions'),
       500
     );
   }

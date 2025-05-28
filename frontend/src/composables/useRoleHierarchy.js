@@ -29,7 +29,13 @@ export function useRoleHierarchy() {
   };
 
   const canEditUser = (user) => {
-    if (!currentUser.value?.role_name) return false;
+    if (!currentUser.value) return false;
+    
+    // Always allow editing own profile
+    if (currentUser.value.id === user.id) return true;
+    
+    // For other users, check role hierarchy
+    if (!currentUser.value.role_name) return false;
     return canManageUser(currentUser.value.role_name, user.role_name);
   };
 

@@ -10,7 +10,10 @@ export const security = {
   sanitizeInput(input) {
     if (typeof input !== 'string') return input;
     
-    return input
+    // Normalize Unicode to prevent homograph attacks
+    const normalized = input.normalize('NFKC');
+    
+    return normalized
       .trim()
       .replace(/[<>\"'%;()&+]/g, '') // Remove potentially dangerous characters
       .substring(0, 255); // Limit length

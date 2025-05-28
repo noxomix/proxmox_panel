@@ -11,11 +11,13 @@ export function getAvatarImage(username) {
   const firstLetter = username.charAt(0).toLowerCase();
   
   // Define the alphabet ranges
-  // a-h gets giraffe, i-q gets pinguin, r-z gets gorilla
-  if (firstLetter <= 'h') {
+  // a-f gets giraffe, g-l gets pinguin, m-r gets wombat, s-z gets gorilla
+  if (firstLetter <= 'f') {
     return '/avatars/giraffe.png';
-  } else if (firstLetter <= 'q') {
+  } else if (firstLetter <= 'l') {
     return '/avatars/pinguin.png';
+  } else if (firstLetter <= 'r') {
+    return '/avatars/wombat.png';
   } else {
     return '/avatars/gorilla.png';
   }
@@ -41,18 +43,18 @@ export function getAvatarImageExtended(username) {
     'd': '/avatars/giraffe.png',
     'e': '/avatars/giraffe.png',
     'f': '/avatars/giraffe.png',
-    'g': '/avatars/giraffe.png',
-    'h': '/avatars/giraffe.png',
+    'g': '/avatars/pinguin.png',
+    'h': '/avatars/pinguin.png',
     'i': '/avatars/pinguin.png',
     'j': '/avatars/pinguin.png',
     'k': '/avatars/pinguin.png',
     'l': '/avatars/pinguin.png',
-    'm': '/avatars/pinguin.png',
-    'n': '/avatars/pinguin.png',
-    'o': '/avatars/pinguin.png',
-    'p': '/avatars/pinguin.png',
-    'q': '/avatars/pinguin.png',
-    'r': '/avatars/gorilla.png',
+    'm': '/avatars/wombat.png',
+    'n': '/avatars/wombat.png',
+    'o': '/avatars/wombat.png',
+    'p': '/avatars/wombat.png',
+    'q': '/avatars/wombat.png',
+    'r': '/avatars/wombat.png',
     's': '/avatars/gorilla.png',
     't': '/avatars/gorilla.png',
     'u': '/avatars/gorilla.png',
@@ -63,5 +65,5 @@ export function getAvatarImageExtended(username) {
     'z': '/avatars/gorilla.png'
   };
 
-  return avatarMapping[firstLetter] || '/avatars/gorilla.png';
+  return avatarMapping[firstLetter] || '/avatars/wombat.png';
 }

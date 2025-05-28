@@ -7,6 +7,7 @@ import auth from './controllers/auth/AuthController.js';
 import users from './controllers/UserController.js';
 import roles from './controllers/RoleController.js';
 import permissions from './controllers/PermissionController.js';
+import debug from './controllers/DebugController.js';
 
 const app = new Hono();
 
@@ -35,6 +36,11 @@ app.route('/api/users', users);
 // Mount role and permission management routes
 app.route('/api/roles', roles);
 app.route('/api/permissions', permissions);
+
+// Mount debug routes (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  app.route('/api/debug', debug);
+}
 
 // Serve theme CSS dynamically
 app.get('/api/theme-css', async (c) => {

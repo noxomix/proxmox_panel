@@ -25,9 +25,27 @@ export const seed = async function(knex) {
       updated_at: new Date()
     },
     {
-      name: 'user_manage',
-      display_name: 'Manage Users',
+      name: 'user_index',
+      display_name: 'Index Users',
+      description: 'Allows user to view and search users',
+      category: 'user_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'user_show',
+      display_name: 'Show User',
       description: 'Allows user to view and manage other users',
+      category: 'user_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'user_update',
+      display_name: 'Update User',
+      description: 'Allows user to update other users email/name when user has less permission than yourself',
       category: 'user_management',
       is_system: true,
       created_at: new Date(),
@@ -36,7 +54,7 @@ export const seed = async function(knex) {
     {
       name: 'user_create',
       display_name: 'Create Users',
-      description: 'Allows user to create new users',
+      description: 'Allows user to create new users which have less permission than yourself',
       category: 'user_management',
       is_system: true,
       created_at: new Date(),
@@ -45,25 +63,106 @@ export const seed = async function(knex) {
     {
       name: 'user_delete',
       display_name: 'Delete Users',
-      description: 'Allows user to delete other users',
+      description: 'Allows user to delete other users which have less permission than yourself',
       category: 'user_management',
       is_system: true,
       created_at: new Date(),
       updated_at: new Date()
     },
     {
-      name: 'role_manage',
-      display_name: 'Manage Roles',
-      description: 'Allows user to view and manage roles',
+      name: 'user_role_assign',
+      display_name: 'Assign User Roles',
+      description: 'Can assign roles to users (still limited by permission hierarchy)',
+      category: 'user_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'user_permissions_view',
+      display_name: 'View User Permissions',
+      description: 'Allows viewing permissions of users for dropdown/listing',
+      category: 'user_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'user_permissions_edit',
+      display_name: 'Edit User Permissions',
+      description: 'Allows editing direct permissions of users which have less permission than yourself (you never can create a user of same permissions as yourself)',
+      category: 'user_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'roles_list',
+      display_name: 'List Roles',
+      description: 'Allows viewing list of roles',
+      category: 'user_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'roles_create',
+      display_name: 'Create Roles',
+      description: 'Allows creating new roles',
       category: 'role_management',
       is_system: true,
       created_at: new Date(),
       updated_at: new Date()
     },
     {
-      name: 'permission_manage',
-      display_name: 'Manage Permissions',
-      description: 'Allows user to view and manage permissions',
+      name: 'roles_edit',
+      display_name: 'Edit Roles',
+      description: 'Allows editing existing roles',
+      category: 'role_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'roles_delete',
+      display_name: 'Delete Roles',
+      description: 'Allows deleting roles',
+      category: 'role_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'permissions_list',
+      display_name: 'List Permissions',
+      description: 'Allows viewing list of permissions',
+      category: 'user_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'permissions_create',
+      display_name: 'Create Permissions',
+      description: 'Allows creating new permissions',
+      category: 'role_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'permissions_edit',
+      display_name: 'Edit Permissions',
+      description: 'Allows editing existing permissions',
+      category: 'role_management',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      name: 'permissions_delete',
+      display_name: 'Delete Permissions',
+      description: 'Allows deleting permissions',
       category: 'role_management',
       is_system: true,
       created_at: new Date(),

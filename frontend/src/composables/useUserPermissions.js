@@ -39,9 +39,9 @@ export function useUserPermissions() {
 
   const loadPermissions = async () => {
     try {
-      const response = await api.get('/permissions');
+      const response = await api.get('/permissions/all');
       if (response.success) {
-        permissions.value = response.data.data;
+        permissions.value = response.data;
         
         // Initialize selectedPermissions
         const selected = {};

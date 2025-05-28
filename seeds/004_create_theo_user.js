@@ -40,7 +40,7 @@ export const seed = async function(knex) {
       status: 'active'
     },
     // Customer users for avatar testing
-    // A-H = Giraffe
+    // A-F = Giraffe
     {
       name: 'Alice Johnson',
       username: 'alice',
@@ -49,16 +49,25 @@ export const seed = async function(knex) {
       password_hash: hashedPassword,
       status: 'active'
     },
-    // I-Q = Pinguin  
+    // G-L = Pinguin  
     {
-      name: 'Mike Williams',
-      username: 'mike',
-      email: 'mike@customer.com',
+      name: 'Kate Williams',
+      username: 'kate',
+      email: 'kate@customer.com',
       role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
-    // R-Z = Gorilla
+    // M-R = Wombat
+    {
+      name: 'Oliver Martinez',
+      username: 'oliver',
+      email: 'oliver@customer.com',
+      role_id: customerRole.id,
+      password_hash: hashedPassword,
+      status: 'active'
+    },
+    // S-Z = Gorilla
     {
       name: 'Sarah Davis',
       username: 'sarah',
@@ -74,6 +83,7 @@ export const seed = async function(knex) {
   console.log('Users seeded successfully:');
   console.log('- theo (admin) - password "123"');
   console.log('- alice (customer, giraffe avatar) - password "123"');
-  console.log('- mike (customer, pinguin avatar) - password "123"');
+  console.log('- kate (customer, pinguin avatar) - password "123"');
+  console.log('- oliver (customer, wombat avatar) - password "123"');
   console.log('- sarah (customer, gorilla avatar) - password "123"');
 };
