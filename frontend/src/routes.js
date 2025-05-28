@@ -47,6 +47,15 @@ export const routes = [
           subtitle: "Manage user roles and permissions"
         },
       },
+      {
+        path: "namespaces",
+        name: "Namespaces",
+        component: () => import("./views/Namespaces.vue"),
+        meta: { 
+          title: "Namespace Management",
+          subtitle: "Manage hierarchical namespace structure"
+        },
+      },
     ],
   },
 ];

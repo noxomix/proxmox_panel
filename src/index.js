@@ -3,11 +3,13 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { envConfig, config, isProduction } from './config/environment.js';
 import auth from './controllers/auth/AuthController.js';
 import users from './controllers/UserController.js';
 import roles from './controllers/RoleController.js';
 import permissions from './controllers/PermissionController.js';
 import debug from './controllers/DebugController.js';
+import NamespaceController from './controllers/NamespaceController.js';
 
 const app = new Hono();
 
@@ -36,6 +38,14 @@ app.route('/api/users', users);
 // Mount role and permission management routes
 app.route('/api/roles', roles);
 app.route('/api/permissions', permissions);
+
+// Mount namespace routes (no auth required)
+app.get('/api/namespaces', NamespaceController.getNamespaces);
+app.get('/api/namespaces/:id', NamespaceController.getNamespace);
+app.post('/api/namespaces', NamespaceController.createNamespace);
+app.patch('/api/namespaces/:id', NamespaceController.updateNamespace);
+app.delete('/api/namespaces/:id', NamespaceController.deleteNamespace);
+app.get('/api/namespaces/:id/tree', NamespaceController.getNamespaceTree);
 
 // Mount debug routes (only in development)
 if (process.env.NODE_ENV !== 'production') {
@@ -84,13 +94,17 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-const port = process.env.PORT || 3000;
+// Validate environment configuration on startup
+if (!envConfig.isValid()) {
+  console.error('🔴 FATAL: Invalid environment configuration');
+  envConfig.logStatus();
+  if (isProduction()) {
+    process.exit(1);
+  }
+} else {
+  envConfig.logStatus();
+}
 
-// Export for Bun's native server
-export default {
-  port,
-  fetch: app.fetch,
-};
-
-// Export app for testing
+// Export app for server.js and testing
+export default app;
 export { app };

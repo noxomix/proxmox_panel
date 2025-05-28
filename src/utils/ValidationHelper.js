@@ -3,7 +3,7 @@
  */
 import { security } from './security.js';
 
-export class ValidationHelper {
+class ValidationHelper {
   /**
    * Validate user data for create/update operations
    */
@@ -92,4 +92,34 @@ export class ValidationHelper {
       isValid: true
     };
   }
+
+  /**
+   * Validate namespace data
+   */
+  static validateNamespace(data) {
+    const errors = [];
+
+    if (!data.name?.trim()) {
+      errors.push('Namespace name is required');
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(data.name)) {
+      errors.push('Namespace name can only contain letters, numbers, hyphens and underscores');
+    } else if (data.name.length < 2 || data.name.length > 50) {
+      errors.push('Namespace name must be between 2 and 50 characters');
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Validate UUID format
+   */
+  static isValidUUID(uuid) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  }
 }
+
+export default ValidationHelper;

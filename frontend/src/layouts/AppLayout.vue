@@ -62,6 +62,14 @@
                     </SidebarLink>
 
                     <SidebarLink
+                        to="/namespaces"
+                        :icon="FolderIcon"
+                        :sidebarCollapsed="sidebarCollapsed"
+                    >
+                        Namespaces
+                    </SidebarLink>
+
+                    <SidebarLink
                         :icon="LockIcon"
                         :sidebarCollapsed="sidebarCollapsed"
                     >
@@ -266,6 +274,7 @@ import ChevronDownIcon from "../components/icons/ChevronDownIcon.vue";
 import UserIcon from "../components/icons/UserIcon.vue";
 import LockIcon from "../components/icons/LockIcon.vue";
 import BriefcaseIcon from "../components/icons/BriefcaseIcon.vue";
+import FolderIcon from "../components/icons/FolderIcon.vue";
 import Avatar from "../components/Avatar.vue";
 import { getAvatarImage } from "../utils/avatarHelper.js";
 import DarkModeToggle from "../components/DarkModeToggle.vue";
@@ -285,6 +294,7 @@ export default {
         UserIcon,
         LockIcon,
         BriefcaseIcon,
+        FolderIcon,
         Avatar,
         DarkModeToggle,
         AppLogo,
