@@ -20,17 +20,22 @@ users.use('/*/delete', strictRateLimit);
 users.post('/', strictRateLimit); // Only for create operations
 
 // Apply permission checks to specific routes
-users.get('/', requirePermission('user_index'));
-users.get('/:id', requirePermission('user_show'));
-users.post('/', requirePermission('user_create'));
-users.put('/:id', requirePermission('user_update'));
-users.delete('/:id', requirePermission('user_delete'));
+// Permission middleware is applied within each endpoint
 
 /**
  * GET /api/users - List users with pagination and search
  */
 users.get('/', async (c) => {
   try {
+    // Check permission
+    const { user: currentUser } = getAuthData(c);
+    const hasPermission = await User.hasPermission(currentUser.id, 'user_index');
+    if (!hasPermission) {
+      return c.json(
+        apiResponse.error('Access denied'),
+        403
+      );
+    }
     const page = parseInt(c.req.query('page')) || 1;
     const limit = parseInt(c.req.query('limit')) || 10;
     const search = c.req.query('search') || '';
@@ -71,7 +76,6 @@ users.get('/', async (c) => {
     });
 
     // Add can_edit field for each user
-    const currentUser = c.get('user');
     const usersWithCanEdit = await Promise.all(
       result.data.map(async (user) => {
         // Allow profile editing for self, admin editing for others based on permissions
@@ -115,6 +119,15 @@ users.get('/', async (c) => {
  */
 users.get('/:id', async (c) => {
   try {
+    // Check permission
+    const { user: currentUser } = getAuthData(c);
+    const hasPermission = await User.hasPermission(currentUser.id, 'user_show');
+    if (!hasPermission) {
+      return c.json(
+        apiResponse.error('Access denied'),
+        403
+      );
+    }
     const userId = c.req.param('id');
     
     if (!userId || typeof userId !== 'string' || userId.length < 10) {
@@ -154,6 +167,15 @@ users.get('/:id', async (c) => {
  */
 users.post('/', async (c) => {
   try {
+    // Check permission
+    const { user: currentUser } = getAuthData(c);
+    const hasPermission = await User.hasPermission(currentUser.id, 'user_create');
+    if (!hasPermission) {
+      return c.json(
+        apiResponse.error('Access denied'),
+        403
+      );
+    }
     const { name, email, password, role_id, status = 'active' } = await c.req.json();
 
     // Validate required fields
@@ -242,8 +264,13 @@ users.post('/', async (c) => {
 
     // Create user with atomic transaction
     const userId = await db.transaction(async (trx) => {
+      // Generate username from email
+      const emailPrefix = email.split('@')[0].toLowerCase();
+      const username = emailPrefix.replace(/[^a-zA-Z0-9]/g, '') || 'user';
+      
       const userData = {
         name: security.sanitizeInput(name),
+        username: username,
         email: security.sanitizeInput(email.toLowerCase()),
         password_hash: hashedPassword,
         role_id,
@@ -251,15 +278,15 @@ users.post('/', async (c) => {
       };
 
       // Create user within transaction
-      const [newUserId] = await trx('users').insert(userData);
+      await trx('users').insert(userData);
       
-      // Verify user was created successfully
-      const createdUser = await trx('users').where('id', newUserId).first();
+      // Get the created user by email (unique identifier)
+      const createdUser = await trx('users').where('email', userData.email).first();
       if (!createdUser) {
         throw new Error('Failed to create user');
       }
       
-      return newUserId;
+      return createdUser.id;
     });
     
     const newUser = await User.findById(userId);
@@ -576,26 +603,47 @@ users.put('/:id/permissions', requirePermission('user_permissions_edit'), async 
         403
       );
     }
-
-    // Validate that user cannot have fewer permissions than their role
-    if (user.role_id) {
-      const rolePermissions = await User.getRolePermissions(userId);
-      const rolePermissionIds = rolePermissions.map(p => p.id);
-      
-      // Check if any role permissions are being removed
-      const missingRolePermissions = rolePermissionIds.filter(
-        rolePermId => !permissions.includes(rolePermId)
+    
+    // Additional check: Ensure the resulting permissions (role + direct) won't exceed actor's permissions
+    const targetRolePermissions = await User.getRolePermissions(userId);
+    const targetRolePermissionIds = new Set(targetRolePermissions.map(p => p.id));
+    
+    // Calculate what the target user's total permissions would be
+    const totalTargetPermissionIds = new Set([
+      ...targetRolePermissionIds,
+      ...permissions
+    ]);
+    
+    // Get actor's total permissions
+    const actorPermissions = await User.getPermissions(currentUser.id);
+    
+    // Check if target would have equal or more permissions than actor
+    if (totalTargetPermissionIds.size >= actorPermissions.length) {
+      return c.json(
+        apiResponse.validation({
+          permissions: ['The resulting permissions would equal or exceed your own permissions']
+        }),
+        403
       );
-      
-      if (missingRolePermissions.length > 0) {
-        return c.json(
-          apiResponse.validation({
-            permissions: ['Cannot remove permissions that are granted by the user\'s role']
-          }),
-          400
-        );
-      }
     }
+    
+    // Check if target would have any permission that actor doesn't have
+    const actorPermissionIds = new Set(actorPermissions.map(p => p.id));
+    const hasUnauthorizedPermission = [...totalTargetPermissionIds].some(
+      permId => !actorPermissionIds.has(permId)
+    );
+    
+    if (hasUnauthorizedPermission) {
+      return c.json(
+        apiResponse.validation({
+          permissions: ['The resulting permissions would include permissions you do not have']
+        }),
+        403
+      );
+    }
+
+    // Note: We don't validate role permissions here since the frontend 
+    // only sends direct permissions (excluding role permissions)
 
     // Get only the additional permissions (not covered by role)
     const rolePermissions = await User.getRolePermissions(userId);
@@ -629,7 +677,7 @@ users.put('/:id/permissions', requirePermission('user_permissions_edit'), async 
 /**
  * DELETE /api/users/:id - Delete user
  */
-users.delete('/:id', async (c) => {
+users.delete('/:id', requirePermission('user_delete'), async (c) => {
   try {
     const userId = c.req.param('id');
     const { user: currentUser } = getAuthData(c);
@@ -655,6 +703,15 @@ users.delete('/:id', async (c) => {
       return c.json(
         apiResponse.error('User not found'),
         404
+      );
+    }
+
+    // Check if current user can manage target user (permission superset)
+    const canManage = await PermissionHelper.canManageUser(currentUser.id, userId);
+    if (!canManage) {
+      return c.json(
+        apiResponse.forbidden('You cannot delete users with equal or more permissions than your own'),
+        403
       );
     }
 

@@ -221,117 +221,78 @@ All interactive elements (buttons, links, form focus states) should use the bran
 
 ## Role-Based Access Control (RBAC) System
 
-### Role Hierarchy & Permissions Logic
+### Core Permission System Architecture
 
-#### Role Hierarchy (Lower number = Higher privilege)
+The system uses a **permission-based hierarchy** instead of fixed role hierarchies. Each user's effective permissions are the union of their role permissions and direct permissions.
+
+### Permission Hierarchy Rules
+
+#### 1. Proper Subset Rule
+- **Core Principle**: A user can only manage another user if they have a **proper superset** of that user's permissions
+- **Implementation**: `actorPermissions.length > targetPermissions.length && targetPermissions ⊆ actorPermissions`
+- **Example**: User with 10 permissions can manage user with 8 permissions (if all 8 are included in the 10)
+
+#### 2. Role Assignment Rules
+- **Rule**: Can only assign roles where you have ALL permissions the role grants
+- **Validation**: Role permissions must be a proper subset of actor's permissions
+- **Example**: To assign "Manager" role, you must have all Manager permissions plus at least one more
+
+#### 3. Permission Assignment Rules
+- **Direct Permissions**: Can only grant permissions you possess
+- **Total Validation**: Target's total permissions (role + direct) must remain a proper subset
+- **Self-Restriction**: Cannot modify own permissions
+
+### Database Structure
+
+#### Tables
+- **users**: id, name, email, username, password_hash, role_id, status
+- **roles**: id, name, display_name, description, is_system
+- **permissions**: id, name, display_name, description, category, is_system
+- **role_permissions**: role_id, permission_id
+- **user_permissions**: user_id, permission_id (direct permissions)
+
+### Permission Categories
+
 ```
-1. Admin    - Highest privilege, can manage everything
-2. Manager  - Can manage customers and users, but not other managers/admins
-3. Customer - Can manage users only
-4. User     - Lowest privilege, can only manage own profile
-```
+Authentication:
+- login, api_token_generate
 
-#### Core RBAC Rules
-
-##### 1. Role Assignment Rules
-- **Rule**: Users can only assign roles **strictly lower** than their own
-- **Implementation**: `currentLevel < targetLevel`
-- **Examples**:
-  - Admin (1) → Can assign: Manager (2), Customer (3), User (4) ✅
-  - Manager (2) → Can assign: Customer (3), User (4) ✅
-  - Customer (3) → Can assign: User (4) ✅
-  - User (4) → Cannot assign any roles ❌
-
-##### 2. User Management Rules
-- **Edit Restriction**: Can only edit users with **strictly lower** roles
-- **Self-Edit Permission**: Can always edit own profile (name, email, password)
-- **Self-Edit Restriction**: Cannot change own role or status
-- **Delete Restriction**: Can only delete **disabled** users with lower roles
-
-##### 3. Permission System Rules
-- **Role Permissions**: Inherited automatically, cannot be removed
-- **Direct Permissions**: Additional permissions beyond role
-- **Permission Rule**: Users cannot have fewer permissions than their role grants
-- **Self-Permission**: Cannot modify own permissions
-- **Assignment Rule**: Can only assign permissions they possess themselves
-
-##### 4. Role Management Rules
-- **Role Creation**: Requires `role_manage` permission
-- **Role Deletion**: Only possible if no users are assigned to that role
-- **System Roles**: Cannot be deleted or have names modified
-- **Permission Assignment**: Can only assign permissions the creator has
-- **Role Assignment**: Requires `user_role_assign` permission + role hierarchy validation
-
-#### Permission Categories & Examples
-```
 User Management:
-- user_view, user_create, user_manage, user_delete, user_role_assign
+- user_index, user_show, user_create, user_update, user_delete
+- user_role_assign, user_permissions_view, user_permissions_edit
 
 Role Management:
-- role_view, role_create, role_manage, role_delete
+- roles_list, role_create, role_update, role_delete
+- role_permissions_manage
 
 System:
-- system_admin, dashboard_view
+- system_settings, permissions_list
 ```
 
-#### UI/UX Security Implementation
+### Security Implementation
 
-##### User Modal Restrictions
-- **Self-Edit Mode**: Role and permission fields disabled with visual feedback
-- **Role Dropdown**: Only shows assignable roles (strictly lower)
-- **Permission Checkboxes**: 
-  - Role permissions: Grayed out, disabled, but checked
-  - Direct permissions: Editable only if not editing self
-- **Default Role**: "Customer" pre-selected for new users
+#### Backend Validation
+1. **PermissionHelper.canManageUser()**: Validates proper superset
+2. **PermissionHelper.canAssignRole()**: Validates role assignment capability
+3. **PermissionHelper.validatePermissionAssignment()**: Ensures permission grants are valid
 
-##### User List Restrictions
-- **Edit Button**: Hidden for users with higher or equal roles
-- **Delete Button**: Only visible for disabled users with lower roles
-- **Visual Indicators**: Clear role badges and status indicators
+#### Self-Edit Restrictions
+- **Allowed**: name, email, password
+- **Forbidden**: role_id, status, permissions
 
-##### Role List Restrictions
-- **Delete Button**: Hidden if users are assigned to role
-- **User Count**: Displayed to show assignment status
+#### UI/UX Implementation
+- **Role Dropdown**: Only shows assignable roles (proper subset check)
+- **Permission Checkboxes**: Disabled for role permissions, editable for direct
+- **Visual Feedback**: Clear indication of role vs direct permissions
 
-#### Backend Validation Stack
+### Default Roles & Permissions
 
-##### Authentication Layer
-- JWT + Database session validation
-- Hybrid authentication system
-- Session revocation capability
+1. **Admin**: All permissions
+2. **Manager**: User management + limited role viewing
+3. **Customer**: Basic login + API token generation
+4. **User**: Login only
 
-##### Authorization Layer
-- Permission-based middleware (`requirePermission`)
-- Role hierarchy validation
-- Self-modification protection
-
-##### Data Layer
-- Input sanitization and validation
-- SQL injection prevention
-- Rate limiting on sensitive operations
-
-#### Security Principles Applied
-
-1. **Principle of Least Privilege**: Users get minimal necessary permissions
-2. **Defense in Depth**: Multiple validation layers (Frontend + Backend)
-3. **Zero Trust**: Every operation validated regardless of UI state
-4. **Audit Trail**: All permission changes logged and trackable
-5. **Fail Secure**: Restrictive defaults, explicit permission grants
-
-#### Error Handling & User Feedback
-
-##### User-Friendly Messages
-- "You cannot assign a role higher than your own"
-- "Cannot edit users with higher roles than your own"
-- "Only disabled users can be deleted"
-- "Cannot modify your own permissions"
-
-##### Progressive Disclosure
-- UI elements hidden/disabled based on permissions
-- Contextual help text explaining restrictions
-- Visual feedback for role-inherited vs. direct permissions
-
-This RBAC system ensures secure, hierarchical user management while maintaining intuitive user experience and preventing privilege escalation attacks.
+This permission-based system provides flexible, secure access control without hardcoded hierarchies.
 
 ## Commands
 npm run fresh - freshup database and migrate + Seed

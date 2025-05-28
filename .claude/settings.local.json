@@ -26,7 +26,11 @@
       "Bash(npm run build:*)",
       "Bash(tar:*)",
       "Bash(mv:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules' npx jest tests/users.test.js --runInBand --verbose)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules' npx jest tests/auth-debug.test.js --runInBand)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules' npx jest tests/users.test.js --runInBand --testNamePattern=\"should list users based on permissions\")",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

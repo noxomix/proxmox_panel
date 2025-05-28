@@ -19,13 +19,19 @@ export class PermissionHelper {
     const actorPermissions = await User.getPermissions(actorUserId);
     const targetPermissions = await User.getPermissions(targetUserId);
 
-    // Actor must have ALL permissions that target has (proper superset)
+    // Actor must have ALL permissions that target has AND more (proper superset)
     const actorPermissionIds = new Set(actorPermissions.map(p => p.id));
-    const targetHasMorePermissions = targetPermissions.some(
-      perm => !actorPermissionIds.has(perm.id)
+    const targetPermissionIds = new Set(targetPermissions.map(p => p.id));
+    
+    // Check if actor has all target permissions
+    const hasAllTargetPermissions = targetPermissions.every(
+      perm => actorPermissionIds.has(perm.id)
     );
-
-    return !targetHasMorePermissions;
+    
+    // Check if actor has strictly more permissions (proper superset)
+    const hasMorePermissions = actorPermissions.length > targetPermissions.length;
+    
+    return hasAllTargetPermissions && hasMorePermissions;
   }
 
   /**

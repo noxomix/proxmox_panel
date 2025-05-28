@@ -73,7 +73,7 @@ export const seed = async function(knex) {
       updated_at: new Date()
     }));
 
-  // Customer gets basic permissions
+  // Customer gets basic permissions (no user management)
   const customerPermissionNames = ['login', 'api_token_generate'];
   const customerPermissions = permissions
     .filter(permission => customerPermissionNames.includes(permission.name))

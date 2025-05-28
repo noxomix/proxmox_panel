@@ -93,8 +93,8 @@ export default {
   fetch: app.fetch,
 };
 
-// Start the server
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Start the server only if not in test environment
+if (process.env.NODE_ENV !== 'test' && import.meta.url === `file://${process.argv[1]}`) {
   const { serve } = await import('@hono/node-server');
   
   serve({
@@ -104,3 +104,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   
   console.log(`🚀 Server läuft auf http://localhost:${port}`);
 }
+
+// Export app for testing
+export { app };

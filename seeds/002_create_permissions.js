@@ -6,6 +6,16 @@ export const seed = async function(knex) {
   await knex('permissions').del();
 
   const permissions = [
+    // System permissions
+    {
+      name: 'system_settings',
+      display_name: 'System Settings',
+      description: 'Can manage system-wide settings and configuration',
+      category: 'system',
+      is_system: true,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
     {
       name: 'login',
       display_name: 'Login Access',

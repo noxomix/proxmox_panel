@@ -79,7 +79,10 @@
               {{ role.display_name || role.name }}
             </option>
           </select>
-          <p v-if="errors.role_id" class="mt-1 text-sm text-red-600 dark:text-red-400">
+          <p v-if="isEditingSelf" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            You cannot change your own role
+          </p>
+          <p v-else-if="errors.role_id" class="mt-1 text-sm text-red-600 dark:text-red-400">
             {{ errors.role_id }}
           </p>
         </div>
@@ -101,7 +104,10 @@
             <option value="disabled">Disabled</option>
             <option value="blocked">Blocked</option>
           </select>
-          <p v-if="errors.status" class="mt-1 text-sm text-red-600 dark:text-red-400">
+          <p v-if="isEditingSelf" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            You cannot change your own status
+          </p>
+          <p v-else-if="errors.status" class="mt-1 text-sm text-red-600 dark:text-red-400">
             {{ errors.status }}
           </p>
         </div>
@@ -330,6 +336,19 @@ export default {
         if (response.success) {
           roles.value = response.data.roles;
           
+          // If editing self and current role is not in assignable roles, add it
+          if (isEditingSelf.value && props.user?.role_id) {
+            const hasCurrentRole = roles.value.some(role => role.id === props.user.role_id);
+            if (!hasCurrentRole && props.user.role_name) {
+              // Add current user's role to the dropdown for display
+              roles.value.unshift({
+                id: props.user.role_id,
+                name: props.user.role_name,
+                display_name: props.user.role_display_name || props.user.role_name
+              });
+            }
+          }
+          
           // Set customer as default role if available and not editing
           if (!isEditing.value && !form.value.role_id) {
             const customerRole = roles.value.find(role => role.name === 'customer');
@@ -467,10 +486,14 @@ export default {
       try {
         const data = {
           name: form.value.name,
-          email: form.value.email,
-          role_id: form.value.role_id || null,
-          status: form.value.status
+          email: form.value.email
         };
+
+        // Only add role and status if not editing self
+        if (!isEditingSelf.value) {
+          data.role_id = form.value.role_id || null;
+          data.status = form.value.status;
+        }
 
         // Add password if provided
         if (form.value.password || !isEditing.value) {

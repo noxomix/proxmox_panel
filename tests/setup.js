@@ -1,6 +1,8 @@
 import { beforeAll, afterAll, beforeEach } from '@jest/globals';
 import dotenv from 'dotenv';
+import bcrypt from 'bcrypt';
 import { db } from '../src/db.js';
+import { jwtUtils } from '../src/utils/jwt.js';
 
 // Load test environment variables
 dotenv.config({ path: '.env.testing' });
@@ -22,13 +24,18 @@ beforeEach(async () => {
   // Clear all tables in correct order (foreign keys)
   await db('tokens').del();
   await db('user_permissions').del();
-  await db('users').del();
+  // Delete only test users (preserve seeded users like theo)
+  await db('users').where('email', 'like', '%test%').del();
   // Don't delete roles, permissions, and role_permissions - they are seeded once
 });
 
 // Cleanup after all tests
 afterAll(async () => {
+  // Destroy database connection
   await db.destroy();
+  
+  // Close any open handles
+  await new Promise(resolve => setTimeout(resolve, 100));
 });
 
 // Global test utilities
@@ -41,6 +48,25 @@ global.testUtils = {
   // Get permission by name
   getPermissionByName: async (permissionName) => {
     return await db('permissions').where('name', permissionName).first();
+  },
+  
+  // Generate JWT token for testing
+  generateToken: async (user) => {
+    const token = jwtUtils.generateToken(user, 'session');
+    const payload = jwtUtils.verifyToken(token);
+    
+    // Create session in database
+    await db('tokens').insert({
+      user_id: user.id,
+      type: 'session',
+      token: null, // session tokens don't store the token itself
+      jwt_id: payload.jti,
+      expires_at: new Date(payload.exp * 1000),
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+    
+    return token;
   },
   
   // Assign permissions to user
@@ -71,11 +97,16 @@ global.testUtils = {
       role_id = userRole ? userRole.id : null;
     }
     
+    // Create password hash with pepper
+    const pepper = process.env.APPLICATION_SECRET || 'test-secret';
+    const defaultPassword = 'password123';
+    const password_hash = await bcrypt.hash(defaultPassword + pepper, 10);
+    
     const userData = {
       name: 'Test User',
       username: `testuser_${uniqueId}`,
       email: `test_${uniqueId}@example.com`,
-      password_hash: '$2b$10$test.hash.example', // bcrypt hash for 'password123'
+      password_hash: password_hash,
       role_id: role_id,
       status: 'active',
       created_at: new Date(),

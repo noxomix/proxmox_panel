@@ -17,7 +17,7 @@
     "seed:make": "knex seed:make",
     "fresh": "knex migrate:rollback && knex migrate:latest && knex seed:run",
     "dev:full": "concurrently \"npm run dev\" \"cd frontend && npm run dev\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
-    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --runInBand",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --runInBand --forceExit",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
     "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage"
   },
