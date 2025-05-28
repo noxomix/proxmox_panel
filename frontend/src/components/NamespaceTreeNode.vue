@@ -14,7 +14,7 @@
         </div>
         <code class="text-xs text-gray-500 dark:text-gray-400">{{ node.full_path }}</code>
       </div>
-      <div class="flex items-center gap-1">
+      <div class="flex items-center gap-2">
         <CreateChildButton @click="$emit('create-child', node)" />
         <EditResourceButton 
           v-if="!isRootNamespace"
