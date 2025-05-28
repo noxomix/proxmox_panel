@@ -391,15 +391,8 @@ export default {
       try {
         const response = await api.get(`/users/${props.user.id}/permissions`);
         if (response.success) {
-          // Create new object to trigger reactivity
-          const newSelected = { ...selectedPermissions.value };
-          
-          // Mark all user permissions as selected
-          response.data.permissions.forEach(permission => {
-            if (newSelected.hasOwnProperty(permission.id)) {
-              newSelected[permission.id] = true;
-            }
-          });
+          // Store user's direct permissions
+          userDirectPermissions.value = response.data.directPermissions.map(p => p.id);
           
           // Track role permissions separately
           const rolePerms = {};
@@ -407,6 +400,17 @@ export default {
             rolePerms[permission.id] = true;
           });
           rolePermissions.value = rolePerms;
+          
+          // Create new object to trigger reactivity - only select direct permissions
+          const newSelected = {};
+          permissions.value.forEach(permission => {
+            const isDirectPermission = userDirectPermissions.value.includes(permission.id);
+            const isRolePermission = rolePerms[permission.id];
+            
+            // Show as checked if it's either a direct permission or role permission
+            // But only count as "selected" (for form submission) if it's direct
+            newSelected[permission.id] = isDirectPermission || isRolePermission;
+          });
           
           selectedPermissions.value = newSelected;
         }
@@ -483,11 +487,19 @@ export default {
         if (response.success) {
           // Update permissions if editing
           if (isEditing.value) {
-            const permissionIds = Object.keys(selectedPermissions.value)
-              .filter(id => selectedPermissions.value[id]);
+            // Only send direct permissions (exclude role permissions)
+            const directPermissionIds = Object.keys(selectedPermissions.value)
+              .filter(id => {
+                const isSelected = selectedPermissions.value[id];
+                const isFromCurrentRole = rolePermissions.value[id];
+                
+                // Include if selected AND not from current role
+                // This ensures we only send actual direct permissions
+                return isSelected && !isFromCurrentRole;
+              });
             
             const permissionsResponse = await api.put(`/users/${props.user.id}/permissions`, {
-              permissions: permissionIds
+              permissions: directPermissionIds
             });
             
             if (!permissionsResponse.success) {
@@ -528,29 +540,39 @@ export default {
     watch(() => form.value.role_id, async (newRoleId, oldRoleId) => {
       if (!newRoleId || newRoleId === oldRoleId) return;
       
-      // When role changes, preserve only non-role permissions
-      const preservedPermissions = {};
+      // Store direct permissions before loading new role
+      const directPermissions = {};
       
-      // If editing existing user, preserve their direct permissions
-      if (isEditing.value) {
-        Object.keys(selectedPermissions.value).forEach(permId => {
-          // Keep permission if it was selected AND not from the old role
-          if (selectedPermissions.value[permId] && !rolePermissions.value[permId]) {
-            preservedPermissions[permId] = true;
-          }
+      // If editing existing user, we need to preserve their actual direct permissions
+      if (isEditing.value && props.user?.id) {
+        // Get the user's actual direct permissions from the last load
+        const userDirectPerms = await getUserDirectPermissions();
+        userDirectPerms.forEach(permId => {
+          directPermissions[permId] = true;
         });
       }
+      
+      // Reset all permissions to false first
+      const resetSelected = {};
+      permissions.value.forEach(permission => {
+        resetSelected[permission.id] = false;
+      });
+      selectedPermissions.value = resetSelected;
       
       // Load new role permissions
       await loadRolePermissions(newRoleId);
       
-      // Merge preserved permissions with new role permissions
-      const newSelected = { ...selectedPermissions.value };
-      Object.keys(preservedPermissions).forEach(permId => {
-        newSelected[permId] = true;
+      // Re-apply only the user's actual direct permissions
+      Object.keys(directPermissions).forEach(permId => {
+        selectedPermissions.value[permId] = true;
       });
-      selectedPermissions.value = newSelected;
     });
+    
+    // Helper to track user's actual direct permissions
+    const userDirectPermissions = ref([]);
+    const getUserDirectPermissions = () => {
+      return userDirectPermissions.value;
+    };
 
     const loadCurrentUser = async () => {
       try {
