@@ -144,7 +144,7 @@
               <div class="mr-3">
                 <Avatar 
                   :imageUrl="getAvatarImage(user.username || '')"
-                  size="md"
+                  size="lg"
                   :alt="`${user.name} Avatar`"
                 />
               </div>

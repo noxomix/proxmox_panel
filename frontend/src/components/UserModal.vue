@@ -25,6 +25,24 @@
 
         <div>
           <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">
+            Username *
+          </label>
+          <BaseInput
+            v-model="form.username"
+            type="text"
+            placeholder="e.g., johndoe"
+            :error="errors.username"
+            :disabled="isEditing"
+            autocomplete="username"
+            required
+          />
+          <p v-if="isEditing" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Username cannot be changed after creation
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-900 dark:text-white mb-2">
             Email *
           </label>
           <BaseInput
@@ -246,6 +264,7 @@ export default {
 
     const form = ref({
       name: '',
+      username: '',
       email: '',
       password: '',
       role_id: '',
@@ -267,7 +286,7 @@ export default {
     });
 
     const isFormValid = computed(() => {
-      const hasBasicInfo = form.value.name.trim() && form.value.email.trim();
+      const hasBasicInfo = form.value.name.trim() && form.value.username.trim() && form.value.email.trim();
       const hasPassword = isEditing.value ? true : form.value.password.trim();
       return hasBasicInfo && hasPassword;
     });
@@ -468,6 +487,7 @@ export default {
     const resetForm = () => {
       form.value = {
         name: '',
+        username: '',
         email: '',
         password: '',
         role_id: '',
@@ -491,6 +511,7 @@ export default {
       if (props.user) {
         form.value = {
           name: props.user.name || '',
+          username: props.user.username || '',
           email: props.user.email || '',
           password: '',
           role_id: props.user.role_id || '',
@@ -515,6 +536,11 @@ export default {
           name: form.value.name,
           email: form.value.email
         };
+
+        // Add username only for create operations
+        if (!isEditing.value) {
+          data.username = form.value.username;
+        }
 
         // Only add role and status if not editing self
         if (!isEditingSelf.value) {

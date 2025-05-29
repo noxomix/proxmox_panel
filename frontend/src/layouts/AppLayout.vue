@@ -184,7 +184,7 @@
                                                         user?.username || '',
                                                     )
                                                 "
-                                                size="md"
+                                                size="md-lg"
                                                 :alt="
                                                     user?.name || 'User Avatar'
                                                 "

@@ -16,7 +16,7 @@
     "migrate:make": "bunx knex migrate:make",
     "seed": "bunx knex seed:run",
     "seed:make": "bunx knex seed:make",
-    "fresh": "bun run migrate:rollback && bun run migrate && bun run seed",
+    "fresh": "bunx knex migrate:rollback --all && bunx knex migrate:latest && bunx knex seed:run",
     "dev:full": "concurrently \"bun run dev\" \"cd frontend && bun run dev\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
     "test": "bun test --serial",
     "frontend": "cd frontend && bun run dev",

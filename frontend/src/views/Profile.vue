@@ -123,11 +123,12 @@
         <div class="flex items-center space-x-3">
           <PrimaryButton
             variant="warning"
-            text="Sign out all other devices"
-            icon="LogoutIcon"
             :disabled="sessionsLoading || sessions.length <= 1"
             @click="revokeAllSessions"
-          />
+          >
+            <LogoutIcon class="w-4 h-4 mr-2" />
+            Sign out all other devices
+          </PrimaryButton>
           <RippleEffect :disabled="sessionsLoading" color="rgba(37, 99, 235, 0.3)" v-slot="{ createRipple }">
             <button
               @click="(e) => { createRipple(e); loadSessions(); }"
@@ -174,7 +175,7 @@
             <ActionButton
               variant="danger"
               title="Sign out (current session)"
-              icon="LogoutIcon"
+              :icon="LogoutIcon"
               @click="handleCurrentSessionLogout"
             />
           </div>
@@ -182,7 +183,7 @@
             <ActionButton
               variant="danger"
               title="Sign out session"
-              icon="LogoutIcon"
+              :icon="LogoutIcon"
               @click="revokeSession(session.id)"
             />
           </div>
@@ -211,6 +212,7 @@ import PasswordInput from '../components/PasswordInput.vue'
 import SpinnerIcon from '../components/icons/SpinnerIcon.vue'
 import CheckIcon from '../components/icons/CheckIcon.vue'
 import RefreshIcon from '../components/icons/RefreshIcon.vue'
+import LogoutIcon from '../components/icons/LogoutIcon.vue'
 import CopyButton from '../components/CopyButton.vue'
 import RippleEffect from '../components/RippleEffect.vue'
 import ActionButton from '../components/ActionButton.vue'
@@ -223,6 +225,7 @@ export default {
     SpinnerIcon,
     CheckIcon,
     RefreshIcon,
+    LogoutIcon,
     CopyButton,
     RippleEffect,
     ActionButton,

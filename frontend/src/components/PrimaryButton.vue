@@ -40,7 +40,7 @@ const handleClick = (e) => {
 };
 
 const buttonClasses = computed(() => {
-  const base = 'relative overflow-hidden px-4 py-2 text-sm font-medium border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors';
+  const base = 'relative overflow-hidden px-4 py-2 text-sm font-medium border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors flex items-center justify-center whitespace-nowrap';
   
   const variants = {
     primary: 'text-white bg-brand-600 hover:bg-brand-700 focus:ring-brand-500',

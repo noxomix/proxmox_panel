@@ -28,50 +28,68 @@ export const seed = async function(knex) {
   
   console.log('Seeding users with APPLICATION_SECRET:', pepper);
   
-  // Inserts seed entries - users to test all avatar types
+  // Inserts seed entries - users to test all avatar types with international names
   const users = [
-    // Admin user
+    // Admin user - German
     {
-      name: 'Theo Admin',
+      name: 'Theo',
       username: 'theo',
       email: 'theo@example.com',
       role_id: adminRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
-    // Customer users for avatar testing
-    // A-F = Giraffe
+    // Customer users for avatar testing with international names
+    // A-F = Giraffe - Estonian (Jaan Tamm equivalent)
     {
-      name: 'Alice Johnson',
-      username: 'alice',
-      email: 'alice@customer.com',
+      name: 'Anti Tamm',
+      username: 'anti',
+      email: 'anti@customer.com',
       role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
-    // G-L = Pinguin  
+    // G-L = Pinguin - Moldovan (Ion Popescu equivalent)
     {
-      name: 'Kate Williams',
-      username: 'kate',
-      email: 'kate@customer.com',
+      name: 'Ion Popescu',
+      username: 'ion',
+      email: 'ion@customer.com',
       role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
-    // M-R = Wombat
+    // M-R = Wombat - Portuguese (João Silva equivalent)
     {
-      name: 'Oliver Martinez',
-      username: 'oliver',
-      email: 'oliver@customer.com',
+      name: 'Manuel Silva',
+      username: 'manuel',
+      email: 'manuel@customer.com',
       role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
-    // S-Z = Gorilla
+    // S-Z = Gorilla - Ghanaian (Kwame Asante equivalent)
     {
-      name: 'Sarah Davis',
-      username: 'sarah',
-      email: 'sarah@customer.com',
+      name: 'Samuel Asante',
+      username: 'samuel',
+      email: 'samuel@customer.com',
+      role_id: customerRole.id,
+      password_hash: hashedPassword,
+      status: 'active'
+    },
+    // Extra user - Uruguayan (Juan Pérez equivalent)
+    {
+      name: 'Carlos Pérez',
+      username: 'carlos',
+      email: 'carlos@customer.com',
+      role_id: customerRole.id,
+      password_hash: hashedPassword,
+      status: 'active'
+    },
+    // Extra user - Slovak (Ján Novák equivalent)
+    {
+      name: 'Ján Novák',
+      username: 'jan',
+      email: 'jan@customer.com',
       role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
@@ -81,9 +99,11 @@ export const seed = async function(knex) {
   await knex('users').insert(users);
   
   console.log('Users seeded successfully:');
-  console.log('- theo (admin) - password "123"');
-  console.log('- alice (customer, giraffe avatar) - password "123"');
-  console.log('- kate (customer, pinguin avatar) - password "123"');
-  console.log('- oliver (customer, wombat avatar) - password "123"');
-  console.log('- sarah (customer, gorilla avatar) - password "123"');
+  console.log('- theo (admin, German) - password "123"');
+  console.log('- anti (customer, Estonian, giraffe avatar) - password "123"');
+  console.log('- ion (customer, Moldovan, pinguin avatar) - password "123"');
+  console.log('- manuel (customer, Portuguese, wombat avatar) - password "123"');
+  console.log('- samuel (customer, Ghanaian, gorilla avatar) - password "123"');
+  console.log('- carlos (customer, Uruguayan) - password "123"');
+  console.log('- jan (customer, Slovak) - password "123"');
 };

@@ -176,7 +176,7 @@ users.post('/', async (c) => {
         403
       );
     }
-    const { name, email, password, role_id, status = 'active' } = await c.req.json();
+    const { name, username, email, password, role_id, status = 'active' } = await c.req.json();
 
     // Validate required fields
     const errors = {};
@@ -185,6 +185,12 @@ users.post('/', async (c) => {
       errors.name = ['Name is required'];
     } else if (!security.isValidName(name)) {
       errors.name = ['Invalid name format (2-50 characters, letters, spaces, hyphens and apostrophes only)'];
+    }
+
+    if (!username) {
+      errors.username = ['Username is required'];
+    } else if (!security.isValidUsername(username)) {
+      errors.username = ['Invalid username format'];
     }
 
     if (!email) {
@@ -242,11 +248,22 @@ users.post('/', async (c) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findByIdentity(email);
-    if (existingUser) {
+    const existingUserByEmail = await User.findByIdentity(email);
+    if (existingUserByEmail) {
       return c.json(
         apiResponse.validation({
           email: ['Email already exists']
+        }),
+        400
+      );
+    }
+
+    // Check if username already exists
+    const existingUserByUsername = await User.findByIdentity(username);
+    if (existingUserByUsername) {
+      return c.json(
+        apiResponse.validation({
+          username: ['Username already exists']
         }),
         400
       );
@@ -264,13 +281,9 @@ users.post('/', async (c) => {
 
     // Create user with atomic transaction
     const userId = await db.transaction(async (trx) => {
-      // Generate username from email
-      const emailPrefix = email.split('@')[0].toLowerCase();
-      const username = emailPrefix.replace(/[^a-zA-Z0-9]/g, '') || 'user';
-      
       const userData = {
         name: security.sanitizeInput(name),
-        username: username,
+        username: security.sanitizeInput(username.toLowerCase()),
         email: security.sanitizeInput(email.toLowerCase()),
         password_hash: hashedPassword,
         role_id,
@@ -313,7 +326,17 @@ users.post('/', async (c) => {
 users.put('/:id', async (c) => {
   try {
     const userId = c.req.param('id');
-    const { name, email, role_id, status, password } = await c.req.json();
+    const { name, email, username, role_id, status, password } = await c.req.json();
+
+    // Block username changes
+    if (username !== undefined) {
+      return c.json(
+        apiResponse.validation({
+          username: ['Username cannot be changed after creation']
+        }),
+        400
+      );
+    }
     const { user: currentUser } = getAuthData(c);
 
     if (!userId || typeof userId !== 'string' || userId.length < 10) {
