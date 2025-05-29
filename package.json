@@ -17,7 +17,8 @@
     "seed:make": "bunx knex seed:make",
     "fresh": "bun run migrate:rollback && bun run migrate && bun run seed",
     "dev:full": "concurrently \"bun run dev\" \"cd frontend && bun run dev\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
-    "test": "bun test",
+    "test": "bun test --serial",
+    "frontend": "cd frontend && npm run dev",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage"
   },
