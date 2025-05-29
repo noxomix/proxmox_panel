@@ -70,9 +70,9 @@
         <tr v-for="namespace in namespaces" :key="namespace.id"
             class="odd:bg-gray-50 odd:dark:bg-gray-700 even:bg-white even:dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-600">
           <td class="px-6 py-4 whitespace-nowrap">
-            <code class="text-sm bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded text-gray-700 dark:text-gray-300">
+            <CodeBox>
               <span v-html="formatPathWithBoldName(namespace.full_path)"></span>
-            </code>
+            </CodeBox>
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             <div class="text-sm text-gray-500 dark:text-gray-400">
@@ -187,6 +187,7 @@ import ModalInterface from '../components/ModalInterface.vue';
 import NamespaceModal from '../components/NamespaceModal.vue';
 import NamespaceTreeNode from '../components/NamespaceTreeNode.vue';
 import ToggleSwitch from '../components/ToggleSwitch.vue';
+import CodeBox from '../components/CodeBox.vue';
 
 // State
 const namespaces = ref([]);

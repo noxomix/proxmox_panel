@@ -31,12 +31,12 @@
         <BaseInput
           id="domain"
           v-model="form.domain"
-          placeholder="e.g., example.com or sub.domain.com"
+          placeholder="e.g., example.com, sub.domain.com, or example.com:8080"
           :error="errors.domain"
           autocomplete="off"
         />
         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Optional domain or subdomain for this namespace
+          Optional domain or subdomain with optional port for this namespace
         </p>
       </div>
 
@@ -104,33 +104,16 @@
 
     <template #footer>
       <div class="flex justify-end space-x-3">
-        <button
-          type="button"
-          @click="$emit('close')"
-          class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-colors"
-        >
+        <SecondaryButton @click="$emit('close')" variant="cancel">
           Cancel
-        </button>
+        </SecondaryButton>
         
-        <button
-          v-if="!isEditMode"
-          type="button"
+        <PrimaryButton
           @click="handleSubmit"
           :disabled="saving"
-          class="px-4 py-2 text-sm font-medium text-white bg-brand-600 border border-transparent rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          Create Namespace
-        </button>
-        
-        <button
-          v-if="isEditMode"
-          type="button"
-          @click="handleSubmit"
-          :disabled="saving"
-          class="px-4 py-2 text-sm font-medium text-white bg-brand-600 border border-transparent rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Update Namespace
-        </button>
+          {{ isEditMode ? 'Update Namespace' : 'Create Namespace' }}
+        </PrimaryButton>
       </div>
     </template>
   </ModalInterface>
@@ -142,6 +125,8 @@ import { api } from '../utils/api';
 import { currentNamespaceId } from '../stores/namespace';
 import ModalInterface from './ModalInterface.vue';
 import BaseInput from './BaseInput.vue';
+import PrimaryButton from './PrimaryButton.vue';
+import SecondaryButton from './SecondaryButton.vue';
 
 const props = defineProps({
   show: {
@@ -179,7 +164,7 @@ const isEditMode = computed(() => !!props.namespace);
 
 const modalTitle = computed(() => {
   if (isEditMode.value) {
-    return 'View Namespace';
+    return props.namespace?.parent_id ? 'Edit Sub-Namespace' : 'Edit Namespace';
   } else if (props.selectedParent) {
     return 'Create Sub-Namespace';
   } else {
@@ -254,9 +239,51 @@ const validateForm = () => {
   
   // Domain validation (optional field)
   if (form.value.domain && form.value.domain.trim()) {
-    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-    if (!domainRegex.test(form.value.domain.trim())) {
-      errors.value.domain = 'Please enter a valid domain or subdomain';
+    const domain = form.value.domain.trim();
+    
+    // Split domain and port
+    const parts = domain.split(':');
+    const domainPart = parts[0];
+    const portPart = parts[1];
+    
+    // Check if it's a valid domain/subdomain
+    // Must have at least one dot for a valid domain (except localhost)
+    const isLocalhost = domainPart.toLowerCase() === 'localhost';
+    const hasDot = domainPart.includes('.');
+    
+    if (!isLocalhost && !hasDot) {
+      errors.value.domain = 'Please enter a valid domain (e.g., example.com) or subdomain (e.g., sub.example.com)';
+      return false;
+    } else if (!isLocalhost) {
+      // Validate domain format
+      const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+      if (!domainRegex.test(domainPart)) {
+        errors.value.domain = 'Invalid domain format. Domain must contain valid characters and a proper TLD (e.g., .com, .org)';
+        return false;
+      }
+    }
+    
+    // Validate port if present
+    if (portPart !== undefined) {
+      if (!/^\d+$/.test(portPart)) {
+        errors.value.domain = 'Port must be a number';
+        return false;
+      } else {
+        const port = parseInt(portPart);
+        if (port < 1 || port > 65535) {
+          errors.value.domain = 'Port must be between 1 and 65535';
+          return false;
+        }
+      }
+    }
+    
+    // Additional validation for invalid patterns
+    if (domainPart.startsWith('.') || domainPart.endsWith('.')) {
+      errors.value.domain = 'Domain cannot start or end with a dot';
+      return false;
+    }
+    if (domainPart.includes('..')) {
+      errors.value.domain = 'Domain cannot contain consecutive dots';
       return false;
     }
   }

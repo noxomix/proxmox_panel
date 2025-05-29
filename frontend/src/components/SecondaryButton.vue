@@ -28,8 +28,8 @@ const props = defineProps({
   },
   variant: {
     type: String,
-    default: 'primary',
-    validator: (value) => ['primary', 'danger', 'warning', 'success'].includes(value)
+    default: 'default',
+    validator: (value) => ['default', 'cancel'].includes(value)
   }
 });
 
@@ -40,13 +40,11 @@ const handleClick = (e) => {
 };
 
 const buttonClasses = computed(() => {
-  const base = 'relative overflow-hidden px-4 py-2 text-sm font-medium border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors';
+  const base = 'relative overflow-hidden px-4 py-2 text-sm font-medium border rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors';
   
   const variants = {
-    primary: 'text-white bg-brand-600 hover:bg-brand-700 focus:ring-brand-500',
-    danger: 'text-white bg-red-600 hover:bg-red-700 focus:ring-red-500',
-    warning: 'text-white bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500',
-    success: 'text-white bg-green-600 hover:bg-green-700 focus:ring-green-500'
+    default: 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-gray-500',
+    cancel: 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-gray-500'
   };
   
   const disabled = 'disabled:opacity-50 disabled:cursor-not-allowed';
@@ -55,12 +53,6 @@ const buttonClasses = computed(() => {
 });
 
 const rippleColor = computed(() => {
-  const colors = {
-    primary: 'rgba(255, 255, 255, 0.3)',
-    danger: 'rgba(255, 255, 255, 0.3)',
-    warning: 'rgba(255, 255, 255, 0.3)',
-    success: 'rgba(255, 255, 255, 0.3)'
-  };
-  return colors[props.variant];
+  return props.variant === 'cancel' ? 'rgba(251, 113, 133, 0.2)' : 'rgba(107, 114, 128, 0.3)';
 });
 </script>

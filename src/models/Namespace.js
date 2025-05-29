@@ -64,14 +64,28 @@ class Namespace {
     return this.findById(id);
   }
 
-  static async update(id, { name }) {
+  static async update(id, { domain }) {
     const namespace = await this.findById(id);
     if (!namespace) {
       throw new Error('Namespace not found');
     }
     
-    // Namespace names are immutable after creation
-    throw new Error('Namespace names cannot be changed after creation');
+    // Check if it's the root namespace
+    if (!namespace.parent_id && namespace.name === (process.env.ROOT_NAMESPACE || 'root')) {
+      throw new Error('Cannot update root namespace');
+    }
+    
+    // Only domain can be updated, not name
+    const updateData = {};
+    if (domain !== undefined) {
+      updateData.domain = domain || null; // Allow null to remove domain
+    }
+    
+    await db(this.tableName)
+      .where({ id })
+      .update(updateData);
+    
+    return this.findById(id);
   }
 
   static async delete(id) {

@@ -112,9 +112,46 @@ class ValidationHelper {
 
     // Domain validation (optional field)
     if (data.domain !== undefined && data.domain !== null && data.domain.trim()) {
-      const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-      if (!domainRegex.test(data.domain.trim())) {
-        errors.domain = ['Please enter a valid domain or subdomain'];
+      const domain = data.domain.trim();
+      
+      // Split domain and port
+      const parts = domain.split(':');
+      const domainPart = parts[0];
+      const portPart = parts[1];
+      
+      // Check if it's a valid domain/subdomain
+      // Must have at least one dot for a valid domain (except localhost)
+      const isLocalhost = domainPart.toLowerCase() === 'localhost';
+      const hasDot = domainPart.includes('.');
+      
+      if (!isLocalhost && !hasDot) {
+        errors.domain = ['Please enter a valid domain (e.g., example.com) or subdomain (e.g., sub.example.com)'];
+      } else if (!isLocalhost) {
+        // Validate domain format
+        const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+        if (!domainRegex.test(domainPart)) {
+          errors.domain = ['Invalid domain format. Domain must contain valid characters and a proper TLD (e.g., .com, .org)'];
+        }
+      }
+      
+      // Validate port if present
+      if (portPart !== undefined) {
+        if (!/^\d+$/.test(portPart)) {
+          errors.domain = ['Port must be a number'];
+        } else {
+          const port = parseInt(portPart);
+          if (port < 1 || port > 65535) {
+            errors.domain = ['Port must be between 1 and 65535'];
+          }
+        }
+      }
+      
+      // Additional validation for invalid patterns
+      if (domainPart.startsWith('.') || domainPart.endsWith('.')) {
+        errors.domain = ['Domain cannot start or end with a dot'];
+      }
+      if (domainPart.includes('..')) {
+        errors.domain = ['Domain cannot contain consecutive dots'];
       }
     }
 

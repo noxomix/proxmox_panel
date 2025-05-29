@@ -99,6 +99,14 @@ class ApiClient {
     });
   }
 
+  async patch(endpoint, data = null, options = {}) {
+    return this.request(endpoint, {
+      ...options,
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : null
+    });
+  }
+
   // Auth specific methods
   async login(identity, password) {
     const response = await this.post('/auth/login', { identity, password });

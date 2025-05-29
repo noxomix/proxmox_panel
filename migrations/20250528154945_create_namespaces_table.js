@@ -9,6 +9,7 @@ export function up(knex) {
     table.uuid('parent_id').nullable();
     table.string('full_path', 1000).notNullable().unique();
     table.integer('depth').unsigned().notNullable().defaultTo(0);
+    table.string('domain', 255).nullable();
     table.timestamps(true, true);
     
     // Foreign key to self
@@ -18,6 +19,7 @@ export function up(knex) {
     table.index('parent_id');
     table.index('full_path');
     table.index('depth');
+    table.index('domain');
   });
 }
 

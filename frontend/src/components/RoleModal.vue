@@ -128,22 +128,17 @@
     <!-- Footer -->
     <template #footer>
       <div class="flex justify-end space-x-3">
-        <button
-          type="button"
-          @click="handleClose"
-          class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-colors"
-        >
+        <SecondaryButton @click="handleClose" variant="cancel">
           Cancel
-        </button>
+        </SecondaryButton>
         
-        <button
+        <PrimaryButton
           @click="handleSubmit"
           :disabled="!isFormValid || loading"
-          class="px-4 py-2 text-sm font-medium text-white bg-brand-600 border border-transparent rounded-lg hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
         >
           <SpinnerIcon v-if="loading" class="animate-spin -ml-1 mr-2 h-4 w-4" />
           {{ isEditing ? 'Update Role' : 'Create Role' }}
-        </button>
+        </PrimaryButton>
       </div>
     </template>
   </ModalInterface>
@@ -156,6 +151,8 @@ import ModalInterface from './ModalInterface.vue';
 import BaseInput from './BaseInput.vue';
 import BaseCheckbox from './BaseCheckbox.vue';
 import SpinnerIcon from './icons/SpinnerIcon.vue';
+import PrimaryButton from './PrimaryButton.vue';
+import SecondaryButton from './SecondaryButton.vue';
 
 export default {
   name: 'RoleModal',
@@ -163,7 +160,9 @@ export default {
     ModalInterface,
     BaseInput,
     BaseCheckbox,
-    SpinnerIcon
+    SpinnerIcon,
+    PrimaryButton,
+    SecondaryButton
   },
   props: {
     show: {

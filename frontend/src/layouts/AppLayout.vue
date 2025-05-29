@@ -63,7 +63,7 @@
 
                     <SidebarLink
                         to="/namespaces"
-                        :icon="FolderIcon"
+                        :icon="NamespaceIcon"
                         :sidebarCollapsed="sidebarCollapsed"
                     >
                         Namespaces
@@ -258,7 +258,7 @@
             <!-- Page Content -->
             <main class="flex-1 overflow-auto">
                 <div class="py-8 px-8 sm:px-12 lg:px-16">
-                    <router-view />
+                    <router-view :key="routerKey" />
                 </div>
             </main>
         </div>
@@ -273,7 +273,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import api from "../utils/api.js";
 import ChevronDownIcon from "../components/icons/ChevronDownIcon.vue";
@@ -293,6 +293,9 @@ import UsersIcon from "../components/icons/UsersIcon.vue";
 import UserSettingsIcon from "../components/icons/UserSettingsIcon.vue";
 import RippleEffect from "../components/RippleEffect.vue";
 import NamespaceSelector from "../components/NamespaceSelector.vue";
+import NamespaceIcon from "../components/icons/NamespaceIcon.vue";
+import NamespaceAlternativeIcon from "../components/icons/NamespaceAlternativeIcon.vue";
+import { currentNamespaceId } from "../stores/namespace";
 
 export default {
     name: "AppLayout",
@@ -313,6 +316,8 @@ export default {
         UserSettingsIcon,
         RippleEffect,
         NamespaceSelector,
+        NamespaceIcon,
+        NamespaceAlternativeIcon,
     },
     setup() {
         const router = useRouter();
@@ -323,6 +328,7 @@ export default {
         const sidebarCollapsed = ref(false);
 
         const showMobileSidebar = ref(false);
+        const routerKey = ref(0);
 
         const pageTitle = computed(() => {
             return route.meta?.title || route.name || "Dashboard";
@@ -370,6 +376,15 @@ export default {
             }
         });
 
+        // Watch for namespace changes and force re-render of router-view
+        watch(currentNamespaceId, (newNamespaceId, oldNamespaceId) => {
+            // Only reload if namespace actually changed and it's not the initial load
+            if (oldNamespaceId !== null && newNamespaceId !== oldNamespaceId) {
+                // Force re-render of router-view by changing the key
+                routerKey.value++;
+            }
+        });
+
         const toggleSidebar = () => {
             sidebarCollapsed.value = !sidebarCollapsed.value;
         };
@@ -400,6 +415,9 @@ export default {
             LockIcon,
             DashboardIcon,
             UsersIcon,
+            NamespaceIcon,
+            NamespaceAlternativeIcon,
+            routerKey,
         };
     },
 };

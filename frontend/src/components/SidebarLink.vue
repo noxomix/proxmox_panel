@@ -9,7 +9,7 @@
     >
       <component 
         :is="icon" 
-        :className="sidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'" 
+        :className="`${sidebarCollapsed ? 'w-6 h-6' : 'w-5 h-5'} ${$route.path === to ? 'text-brand-600 dark:text-brand-400' : ''}`"
       />
       <span v-if="!sidebarCollapsed" class="ml-3 font-medium">
         <slot />

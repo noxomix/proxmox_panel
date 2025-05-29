@@ -11,13 +11,16 @@
           ]"
         >
           <div class="flex items-center min-w-0">
-            <FolderIcon className="w-4 h-4 text-gray-500 dark:text-gray-400 mr-2 flex-shrink-0" />
+            <FolderIcon 
+              className="w-4 h-4 text-brand-600 dark:text-brand-400 mr-2 flex-shrink-0" 
+              style="fill: currentColor"
+            />
             <span 
               v-if="!sidebarCollapsed" 
               class="text-gray-700 dark:text-gray-300 truncate"
               :title="currentNamespacePath || '/'"
+              v-html="formatPathWithBoldName(currentNamespacePath || '/')"
             >
-              {{ displayPath }}
             </span>
           </div>
           <ChevronDownIcon 
@@ -41,9 +44,11 @@
                 'bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300': currentNamespaceId === namespace.id
               }"
             >
-              <FolderIcon className="w-4 h-4 mr-2 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-              <span class="text-sm text-gray-700 dark:text-gray-300 truncate" :title="namespace.full_path">
-                {{ namespace.full_path }}
+              <FolderIcon 
+                :className="`w-4 h-4 mr-2 flex-shrink-0 ${currentNamespaceId === namespace.id ? 'text-brand-600 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400'}`"
+                :style="currentNamespaceId === namespace.id ? 'fill: currentColor' : ''"
+              />
+              <span class="text-sm text-gray-700 dark:text-gray-300 truncate" :title="namespace.full_path" v-html="formatPathWithBoldName(namespace.full_path)">
               </span>
             </div>
             
@@ -73,14 +78,6 @@ const props = defineProps({
 
 const showDropdown = ref(false);
 
-const displayPath = computed(() => {
-  const path = currentNamespacePath.value || '/';
-  if (path.length > 20) {
-    return '...' + path.slice(-17);
-  }
-  return path;
-});
-
 const sortedNamespaces = computed(() => {
   return availableNamespaces.value.slice().sort((a, b) => {
     return a.full_path.localeCompare(b.full_path);
@@ -95,6 +92,20 @@ const toggleDropdown = () => {
 const selectNamespace = (namespace) => {
   setCurrentNamespace(namespace.id, namespace.full_path);
   showDropdown.value = false;
+};
+
+const formatPathWithBoldName = (fullPath) => {
+  if (!fullPath) return '';
+  
+  const segments = fullPath.split('/');
+  const lastName = segments.pop(); // Get the last segment (name)
+  const parentPath = segments.join('/'); // Get everything before the last segment
+  
+  if (parentPath) {
+    return `${parentPath}/<strong>${lastName}</strong>`;
+  } else {
+    return `<strong>${lastName}</strong>`;
+  }
 };
 
 const fetchNamespaces = async () => {
