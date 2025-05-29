@@ -63,19 +63,19 @@ class NamespaceController {
   static async createNamespace(c) {
     try {
       const body = await c.req.json();
-      const { name, parent_id } = body;
+      const { name, parent_id, domain } = body;
       
       // Validation
-      const validation = ValidationHelper.validateNamespace({ name });
+      const validation = ValidationHelper.validateNamespace({ name, domain });
       if (!validation.valid) {
-        return c.json(apiResponse.validation({ name: validation.errors }), 400);
+        return c.json(apiResponse.validation(validation.errors), 400);
       }
       
       if (parent_id && !ValidationHelper.isValidUUID(parent_id)) {
         return c.json(apiResponse.error('Invalid parent ID'), 400);
       }
       
-      const namespace = await Namespace.create({ name, parent_id });
+      const namespace = await Namespace.create({ name, parent_id, domain });
       
       return c.json(apiResponse.success({
         namespace
@@ -98,19 +98,19 @@ class NamespaceController {
     try {
       const { id } = c.req.param();
       const body = await c.req.json();
-      const { name } = body;
+      const { domain } = body;
       
       if (!ValidationHelper.isValidUUID(id)) {
         return c.json(apiResponse.error('Invalid namespace ID'), 400);
       }
       
-      // Validation
-      const validation = ValidationHelper.validateNamespace({ name });
+      // Validation (only domain for updates, name can't be changed)
+      const validation = ValidationHelper.validateNamespace({ domain });
       if (!validation.valid) {
-        return c.json(apiResponse.validation({ name: validation.errors }), 400);
+        return c.json(apiResponse.validation(validation.errors), 400);
       }
       
-      const namespace = await Namespace.update(id, { name });
+      const namespace = await Namespace.update(id, { domain });
       
       return c.json(apiResponse.success({
         namespace
@@ -157,6 +157,25 @@ class NamespaceController {
       }
       
       return c.json(apiResponse.error('Failed to delete namespace'), 500);
+    }
+  }
+
+  static async getNamespacesList(c) {
+    try {
+      const namespaces = await Namespace.findAll();
+      
+      // Return as id => path mapping for selector
+      const namespaceMap = {};
+      namespaces.forEach(ns => {
+        namespaceMap[ns.id] = ns.full_path;
+      });
+      
+      return c.json(apiResponse.success({
+        namespaces: namespaceMap
+      }));
+    } catch (error) {
+      console.error('Error fetching namespaces list:', error);
+      return c.json(apiResponse.error('Failed to fetch namespaces list'), 500);
     }
   }
 

@@ -3,7 +3,7 @@
         <!-- Sidebar -->
         <aside
             :class="[
-                'bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out z-50',
+                'bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out z-50 flex flex-col',
                 sidebarCollapsed ? 'w-16' : 'w-64',
                 'md:relative md:translate-x-0',
                 showMobileSidebar
@@ -35,8 +35,8 @@
             </div>
 
             <!-- Sidebar Navigation -->
-            <nav class="mt-6 px-3">
-                <ul class="space-y-2">
+            <nav class="mt-6 px-3 flex-1 flex flex-col min-h-0">
+                <ul class="space-y-2 flex-shrink-0">
                     <SidebarLink
                         to="/dashboard"
                         :icon="DashboardIcon"
@@ -76,6 +76,12 @@
                         Settings
                     </SidebarLink>
                 </ul>
+                
+                <!-- Spacer to push namespace selector to bottom -->
+                <div class="flex-1"></div>
+                
+                <!-- Namespace Selector -->
+                <NamespaceSelector :sidebarCollapsed="sidebarCollapsed" />
             </nav>
         </aside>
 
@@ -286,6 +292,7 @@ import DashboardIcon from "../components/icons/DashboardIcon.vue";
 import UsersIcon from "../components/icons/UsersIcon.vue";
 import UserSettingsIcon from "../components/icons/UserSettingsIcon.vue";
 import RippleEffect from "../components/RippleEffect.vue";
+import NamespaceSelector from "../components/NamespaceSelector.vue";
 
 export default {
     name: "AppLayout",
@@ -305,6 +312,7 @@ export default {
         UsersIcon,
         UserSettingsIcon,
         RippleEffect,
+        NamespaceSelector,
     },
     setup() {
         const router = useRouter();

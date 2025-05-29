@@ -97,18 +97,29 @@ class ValidationHelper {
    * Validate namespace data
    */
   static validateNamespace(data) {
-    const errors = [];
+    const errors = {};
 
-    if (!data.name?.trim()) {
-      errors.push('Namespace name is required');
-    } else if (!/^[a-zA-Z0-9_-]+$/.test(data.name)) {
-      errors.push('Namespace name can only contain letters, numbers, hyphens and underscores');
-    } else if (data.name.length < 2 || data.name.length > 50) {
-      errors.push('Namespace name must be between 2 and 50 characters');
+    // Name validation (only if provided)
+    if (data.name !== undefined) {
+      if (!data.name?.trim()) {
+        errors.name = ['Namespace name is required'];
+      } else if (!/^[a-zA-Z0-9_-]+$/.test(data.name)) {
+        errors.name = ['Namespace name can only contain letters, numbers, hyphens and underscores'];
+      } else if (data.name.length < 2 || data.name.length > 50) {
+        errors.name = ['Namespace name must be between 2 and 50 characters'];
+      }
+    }
+
+    // Domain validation (optional field)
+    if (data.domain !== undefined && data.domain !== null && data.domain.trim()) {
+      const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+      if (!domainRegex.test(data.domain.trim())) {
+        errors.domain = ['Please enter a valid domain or subdomain'];
+      }
     }
 
     return {
-      valid: errors.length === 0,
+      valid: Object.keys(errors).length === 0,
       errors
     };
   }

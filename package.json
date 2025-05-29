@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "bun --watch src/index.js",
+    "kill-watch": "pkill -f 'bun.*--watch.*src/index.js' 2>/dev/null || true",
     "start": "bun src/index.js",
     "migrate": "bunx knex migrate:latest",
     "migrate:rollback": "bunx knex migrate:rollback",
@@ -18,7 +19,7 @@
     "fresh": "bun run migrate:rollback && bun run migrate && bun run seed",
     "dev:full": "concurrently \"bun run dev\" \"cd frontend && bun run dev\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
     "test": "bun test --serial",
-    "frontend": "cd frontend && npm run dev",
+    "frontend": "cd frontend && bun run dev",
     "test:watch": "bun test --watch",
     "test:coverage": "bun test --coverage"
   },

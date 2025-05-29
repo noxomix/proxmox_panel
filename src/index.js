@@ -3,7 +3,9 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { envConfig, config, isProduction } from './config/environment.js';
+// Environment configuration
+const PORT = process.env.PORT || 3000;
+const isProduction = process.env.NODE_ENV === 'production';
 import auth from './controllers/auth/AuthController.js';
 import users from './controllers/UserController.js';
 import roles from './controllers/RoleController.js';
@@ -41,6 +43,7 @@ app.route('/api/permissions', permissions);
 
 // Mount namespace routes (no auth required)
 app.get('/api/namespaces', NamespaceController.getNamespaces);
+app.get('/api/namespaces/list', NamespaceController.getNamespacesList);
 app.get('/api/namespaces/:id', NamespaceController.getNamespace);
 app.post('/api/namespaces', NamespaceController.createNamespace);
 app.patch('/api/namespaces/:id', NamespaceController.updateNamespace);
@@ -94,17 +97,28 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Validate environment configuration on startup
-if (!envConfig.isValid()) {
-  console.error('🔴 FATAL: Invalid environment configuration');
-  envConfig.logStatus();
-  if (isProduction()) {
+// Simple environment validation
+if (!process.env.JWT_SECRET) {
+  console.error('🔴 FATAL: JWT_SECRET environment variable is required');
+  if (isProduction) {
     process.exit(1);
   }
-} else {
-  envConfig.logStatus();
 }
 
-// Export app for server.js and testing
-export default app;
-export { app };
+// Graceful shutdown handler for Bun's built-in server
+process.on('SIGINT', () => {
+  console.log('\n🛑 Shutting down server...');
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Shutting down server...');
+  process.exit(0);
+});
+
+// Export app - Bun will automatically serve this when using --watch
+export default {
+  fetch: app.fetch,
+  port: PORT,
+  hostname: '0.0.0.0'
+};
