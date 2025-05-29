@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import UserNamespaceRole from '../models/UserNamespaceRole.js';
 import { apiResponse } from '../utils/response.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
+import { namespaceMiddleware, requireNamespace } from '../middleware/namespace.js';
 import { getAuthData } from '../utils/authHelper.js';
 import { security } from '../utils/security.js';
 import { strictRateLimit } from '../middleware/rateLimiter.js';
@@ -12,30 +14,21 @@ import db from '../db.js';
 
 const users = new Hono();
 
-// Apply authentication middleware to all routes
+// Apply authentication and namespace middleware to all routes
 users.use('*', authMiddleware);
+users.use('*', namespaceMiddleware);
+users.use('*', requireNamespace);
 
 // Apply rate limiting only to sensitive operations
 users.use('/*/delete', strictRateLimit);
 users.post('/', strictRateLimit); // Only for create operations
 
-// Apply permission checks to specific routes
-// Permission middleware is applied within each endpoint
-
 /**
- * GET /api/users - List users with pagination and search
+ * GET /api/users - List users in current namespace with pagination and search
  */
-users.get('/', async (c) => {
+users.get('/', requirePermission('user_index'), async (c) => {
   try {
-    // Check permission
-    const { user: currentUser } = getAuthData(c);
-    const hasPermission = await User.hasPermission(currentUser.id, 'user_index');
-    if (!hasPermission) {
-      return c.json(
-        apiResponse.error('Access denied'),
-        403
-      );
-    }
+    const currentNamespace = c.get('currentNamespace');
     const page = parseInt(c.req.query('page')) || 1;
     const limit = parseInt(c.req.query('limit')) || 10;
     const search = c.req.query('search') || '';
@@ -66,25 +59,78 @@ users.get('/', async (c) => {
       );
     }
 
-    const result = await User.paginate({
-      page,
-      limit,
-      search: security.sanitizeInput(search),
-      status: status ? security.sanitizeInput(status) : '',
-      sortBy,
-      sortOrder
-    });
+    // Get users in current namespace with their roles
+    const offset = (page - 1) * limit;
+    
+    let query = db('user_namespace_roles')
+      .join('users', 'user_namespace_roles.user_id', 'users.id')
+      .join('roles', 'user_namespace_roles.role_id', 'roles.id')
+      .where('user_namespace_roles.namespace_id', currentNamespace.id)
+      .select(
+        'users.*',
+        'roles.name as role_name',
+        'roles.display_name as role_display_name',
+        'user_namespace_roles.created_at as assigned_at'
+      );
 
-    // Add can_edit field for each user
+    let countQuery = db('user_namespace_roles')
+      .join('users', 'user_namespace_roles.user_id', 'users.id')
+      .where('user_namespace_roles.namespace_id', currentNamespace.id)
+      .count('* as total');
+
+    // Add search filters
+    if (search) {
+      const searchCondition = function() {
+        this.where('users.name', 'like', `%${search}%`)
+          .orWhere('users.email', 'like', `%${search}%`)
+          .orWhere('users.username', 'like', `%${search}%`);
+      };
+      query = query.where(searchCondition);
+      countQuery = countQuery.where(searchCondition);
+    }
+
+    // Add status filter
+    if (status) {
+      query = query.where('users.status', status);
+      countQuery = countQuery.where('users.status', status);
+    }
+
+    // Get total count
+    const [{ total }] = await countQuery;
+    
+    // Add sorting and pagination
+    let orderColumn;
+    if (sortBy === 'role_name') {
+      orderColumn = 'roles.name';
+    } else if (sortBy === 'role_display_name') {
+      orderColumn = 'roles.display_name';
+    } else {
+      orderColumn = `users.${sortBy}`;
+    }
+    
+    query = query
+      .orderBy(orderColumn, sortOrder)
+      .limit(limit)
+      .offset(offset);
+
+    // Execute query
+    const users = await query;
+    
+    const totalPages = Math.ceil(total / limit);
+    
+    // Add can_edit field for each user (namespace-aware)
+    const { user: currentUser } = getAuthData(c);
     const usersWithCanEdit = await Promise.all(
-      result.data.map(async (user) => {
-        // Allow profile editing for self, admin editing for others based on permissions
+      users.map(async (user) => {
         const canEditProfile = currentUser.id === user.id;
         const canEditOthers = currentUser.id !== user.id ? 
-          await PermissionHelper.canManageUser(currentUser.id, user.id) : false;
+          await PermissionHelper.canManageUserInNamespace(currentUser.id, user.id, currentNamespace.id) : false;
         
         return {
-          ...user.toJSON(),
+          ...new User(user).toJSON(),
+          role_name: user.role_name,
+          role_display_name: user.role_display_name,
+          assigned_at: user.assigned_at,
           can_edit: canEditProfile || canEditOthers
         };
       })
@@ -93,13 +139,18 @@ users.get('/', async (c) => {
     return c.json(
       apiResponse.success({
         users: usersWithCanEdit,
+        namespace: {
+          id: currentNamespace.id,
+          name: currentNamespace.name,
+          full_path: currentNamespace.full_path
+        },
         pagination: {
-          page: result.page,
-          limit: result.limit,
-          total: result.total,
-          totalPages: result.totalPages,
-          hasNext: result.hasNext,
-          hasPrev: result.hasPrev
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: parseInt(total),
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
         }
       }, 'Users retrieved successfully'),
       200
@@ -115,20 +166,12 @@ users.get('/', async (c) => {
 });
 
 /**
- * GET /api/users/:id - Get single user
+ * GET /api/users/:id - Get single user (namespace-aware)
  */
-users.get('/:id', async (c) => {
+users.get('/:id', requirePermission('user_show'), async (c) => {
   try {
-    // Check permission
-    const { user: currentUser } = getAuthData(c);
-    const hasPermission = await User.hasPermission(currentUser.id, 'user_show');
-    if (!hasPermission) {
-      return c.json(
-        apiResponse.error('Access denied'),
-        403
-      );
-    }
     const userId = c.req.param('id');
+    const currentNamespace = c.get('currentNamespace');
     
     if (!userId || typeof userId !== 'string' || userId.length < 10) {
       return c.json(
@@ -137,8 +180,16 @@ users.get('/:id', async (c) => {
       );
     }
 
+    // Check if user exists in current namespace
+    const userInNamespace = await UserNamespaceRole.findByUserAndNamespace(userId, currentNamespace.id);
+    if (!userInNamespace) {
+      return c.json(
+        apiResponse.error('User not found in this namespace'),
+        404
+      );
+    }
+
     const user = await User.findById(userId);
-    
     if (!user) {
       return c.json(
         apiResponse.error('User not found'),
@@ -146,9 +197,22 @@ users.get('/:id', async (c) => {
       );
     }
 
+    // Get user's role in current namespace
+    const userRole = await UserNamespaceRole.getRoleForUser(userId, currentNamespace.id);
+
     return c.json(
       apiResponse.success({
-        user: user.toJSON()
+        user: {
+          ...user.toJSON(),
+          role_id: userRole?.id,
+          role_name: userRole?.name,
+          role_display_name: userRole?.display_name
+        },
+        namespace: {
+          id: currentNamespace.id,
+          name: currentNamespace.name,
+          full_path: currentNamespace.full_path
+        }
       }, 'User retrieved successfully'),
       200
     );
@@ -163,19 +227,12 @@ users.get('/:id', async (c) => {
 });
 
 /**
- * POST /api/users - Create new user
+ * POST /api/users - Create new user and assign to current namespace
  */
-users.post('/', async (c) => {
+users.post('/', requirePermission('user_create'), async (c) => {
   try {
-    // Check permission
+    const currentNamespace = c.get('currentNamespace');
     const { user: currentUser } = getAuthData(c);
-    const hasPermission = await User.hasPermission(currentUser.id, 'user_create');
-    if (!hasPermission) {
-      return c.json(
-        apiResponse.error('Access denied'),
-        403
-      );
-    }
     const { name, username, email, password, role_id, status = 'active' } = await c.req.json();
 
     // Validate required fields
@@ -184,7 +241,7 @@ users.post('/', async (c) => {
     if (!name) {
       errors.name = ['Name is required'];
     } else if (!security.isValidName(name)) {
-      errors.name = ['Invalid name format (2-50 characters, letters, spaces, hyphens and apostrophes only)'];
+      errors.name = ['Invalid name format'];
     }
 
     if (!username) {
@@ -208,25 +265,23 @@ users.post('/', async (c) => {
       }
     }
 
-    // Validate role_id - role is required
+    // Validate role_id - must be available in current namespace
     if (!role_id) {
       errors.role_id = ['Role is required'];
     } else {
       const Role = (await import('../models/Role.js')).Role;
-      const roleExists = await Role.findById(role_id);
+      const availableRoles = await Role.getAvailableInNamespace(currentNamespace.id);
+      const roleExists = availableRoles.find(r => r.id === role_id);
+      
       if (!roleExists) {
-        errors.role_id = ['Invalid role ID'];
+        errors.role_id = ['Role not available in this namespace'];
       } else {
         // Check if current user can assign this role
-        const { user: currentUser } = getAuthData(c);
-        
-        // Check permission first
-        const canAssignRoles = await User.hasPermission(currentUser.id, 'user_role_assign');
+        const canAssignRoles = await User.hasPermissionInNamespace(currentUser.id, 'user_role_assign', currentNamespace.id);
         if (!canAssignRoles) {
           errors.role_id = ['You do not have permission to assign user roles'];
         } else {
-          // Check if user can assign this role based on permissions
-          const canAssign = await PermissionHelper.canAssignRole(currentUser.id, role_id);
+          const canAssign = await PermissionHelper.canAssignRoleInNamespace(currentUser.id, role_id, currentNamespace.id);
           if (!canAssign) {
             errors.role_id = ['You cannot assign a role with permissions you do not have'];
           }
@@ -237,7 +292,7 @@ users.post('/', async (c) => {
     // Validate status
     const validStatuses = ['active', 'disabled', 'blocked'];
     if (status && !validStatuses.includes(status)) {
-      errors.status = ['Invalid status. Must be active, disabled, or blocked'];
+      errors.status = ['Invalid status'];
     }
 
     if (Object.keys(errors).length > 0) {
@@ -247,7 +302,7 @@ users.post('/', async (c) => {
       );
     }
 
-    // Check if user already exists
+    // Check if user already exists globally
     const existingUserByEmail = await User.findByIdentity(email);
     if (existingUserByEmail) {
       return c.json(
@@ -258,7 +313,6 @@ users.post('/', async (c) => {
       );
     }
 
-    // Check if username already exists
     const existingUserByUsername = await User.findByIdentity(username);
     if (existingUserByUsername) {
       return c.json(
@@ -279,34 +333,53 @@ users.post('/', async (c) => {
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password + pepper, saltRounds);
 
-    // Create user with atomic transaction
-    const userId = await db.transaction(async (trx) => {
+    // Create user and assign to namespace in transaction
+    const result = await db.transaction(async (trx) => {
+      // Create user (without role_id as it's namespace-specific now)
       const userData = {
         name: security.sanitizeInput(name),
         username: security.sanitizeInput(username.toLowerCase()),
         email: security.sanitizeInput(email.toLowerCase()),
         password_hash: hashedPassword,
-        role_id,
+        role_id: null, // We don't use this anymore
         status
       };
 
-      // Create user within transaction
       await trx('users').insert(userData);
       
-      // Get the created user by email (unique identifier)
+      // Get the created user by email
       const createdUser = await trx('users').where('email', userData.email).first();
       if (!createdUser) {
         throw new Error('Failed to create user');
       }
       
+      // Assign user to current namespace with specified role
+      await trx('user_namespace_roles').insert({
+        user_id: createdUser.id,
+        namespace_id: currentNamespace.id,
+        role_id: role_id,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+      
       return createdUser.id;
     });
     
-    const newUser = await User.findById(userId);
+    const newUser = await User.findById(result);
+    const userRole = await UserNamespaceRole.getRoleForUser(result, currentNamespace.id);
 
     return c.json(
       apiResponse.success({
-        user: newUser.toJSON()
+        user: {
+          ...newUser.toJSON(),
+          role_id: userRole?.id,
+          role_name: userRole?.name,
+          role_display_name: userRole?.display_name
+        },
+        namespace: {
+          id: currentNamespace.id,
+          name: currentNamespace.name
+        }
       }, 'User created successfully'),
       201
     );
@@ -321,32 +394,16 @@ users.post('/', async (c) => {
 });
 
 /**
- * PUT /api/users/:id - Update user
+ * PUT /api/users/:id - Update user in current namespace
  */
 users.put('/:id', async (c) => {
   try {
     const userId = c.req.param('id');
+    const currentNamespace = c.get('currentNamespace');
+    const { user: currentUser } = getAuthData(c);
     const { name, email, username, role_id, status, password } = await c.req.json();
 
-    // Block username changes
-    if (username !== undefined) {
-      return c.json(
-        apiResponse.validation({
-          username: ['Username cannot be changed after creation']
-        }),
-        400
-      );
-    }
-    const { user: currentUser } = getAuthData(c);
-
-    if (!userId || typeof userId !== 'string' || userId.length < 10) {
-      return c.json(
-        apiResponse.validation({ id: ['Invalid user ID'] }),
-        400
-      );
-    }
-
-    // Find user to update
+    // Block username changes only if it's actually being changed
     const userToUpdate = await User.findById(userId);
     if (!userToUpdate) {
       return c.json(
@@ -355,26 +412,47 @@ users.put('/:id', async (c) => {
       );
     }
 
-    // Determine if this is a profile edit (only name, email, password) or admin edit (role/status)
-    const isAdminEdit = role_id !== undefined || status !== undefined;
-    const isProfileEdit = !isAdminEdit;
-    const isSelfEdit = userId === currentUser.id;
 
-    // Check permissions based on edit type
-    if (isSelfEdit && isAdminEdit) {
-      // Block self role/status changes
+    if (!userId || typeof userId !== 'string' || userId.length < 10) {
       return c.json(
-        apiResponse.forbidden('Cannot change your own role or status'),
-        403
+        apiResponse.validation({ id: ['Invalid user ID'] }),
+        400
       );
     }
+
+    // Check if user exists in current namespace
+    const userInNamespace = await UserNamespaceRole.findByUserAndNamespace(userId, currentNamespace.id);
+    if (!userInNamespace) {
+      return c.json(
+        apiResponse.error('User not found in this namespace'),
+        404
+      );
+    }
+
+    // Permission checks
+    const isSelfEdit = userId === currentUser.id;
+    
+    // For self-editing, ignore role_id and status changes (treat as undefined)
+    let effectiveRoleId = role_id;
+    let effectiveStatus = status;
+    
+    if (isSelfEdit) {
+      // Get current user's role and status to check if they're actually trying to change it
+      const currentRole = await UserNamespaceRole.getRoleForUser(userId, currentNamespace.id);
+      
+      // For self-edit, always ignore role and status changes (treat as no change)
+      effectiveRoleId = undefined; // Never allow role changes for self-edit
+      effectiveStatus = undefined; // Never allow status changes for self-edit
+    }
+    
+    const isAdminEdit = effectiveRoleId !== undefined || effectiveStatus !== undefined;
+    const isProfileEdit = !isAdminEdit;
     
     if (!isSelfEdit) {
-      // For editing other users, check permission superset
-      const canManage = await PermissionHelper.canManageUser(currentUser.id, userId);
+      const canManage = await PermissionHelper.canManageUserInNamespace(currentUser.id, userId, currentNamespace.id);
       if (!canManage) {
         return c.json(
-          apiResponse.forbidden('You cannot edit users with more permissions than your own'),
+          apiResponse.forbidden('You cannot edit users with more permissions than your own in this namespace'),
           403
         );
       }
@@ -383,18 +461,18 @@ users.put('/:id', async (c) => {
     const errors = {};
     const updateData = {};
 
-    // Validate name if provided
+    // Validate basic fields (name, email, password)
     if (name !== undefined) {
       if (!name) {
         errors.name = ['Name is required'];
       } else if (!security.isValidName(name)) {
-        errors.name = ['Invalid name format (2-50 characters, letters, spaces, hyphens and apostrophes only)'];
+        errors.name = ['Invalid name format'];
       } else {
         updateData.name = security.sanitizeInput(name);
       }
     }
 
-    // Validate email if provided
+
     if (email !== undefined) {
       if (!email) {
         errors.email = ['Email is required'];
@@ -402,7 +480,6 @@ users.put('/:id', async (c) => {
         errors.email = ['Invalid email format'];
       } else {
         const sanitizedEmail = security.sanitizeInput(email.toLowerCase());
-        // Check if email is already taken by another user
         if (sanitizedEmail !== userToUpdate.email) {
           const existingUser = await User.findByIdentity(sanitizedEmail);
           if (existingUser && existingUser.id !== userId) {
@@ -414,52 +491,6 @@ users.put('/:id', async (c) => {
       }
     }
 
-    // Validate role_id if provided
-    if (role_id !== undefined) {
-      if (role_id) {
-        const Role = (await import('../models/Role.js')).Role;
-        const roleExists = await Role.findById(role_id);
-        if (!roleExists) {
-          errors.role_id = ['Invalid role ID'];
-        } else {
-          // Check if current user can assign this role (skip for self-edit keeping same role)
-          const isSelfEditSameRole = userId === currentUser.id && role_id === userToUpdate.role_id;
-          
-          if (!isSelfEditSameRole) {
-            // Check if user has permission to assign roles
-            const canAssignRoles = await User.hasPermission(currentUser.id, 'user_role_assign');
-            if (!canAssignRoles) {
-              errors.role_id = ['You do not have permission to assign user roles'];
-            } else {
-              // Check if user can assign this role based on permissions
-              const canAssign = await PermissionHelper.canAssignRole(currentUser.id, role_id);
-              if (!canAssign) {
-                errors.role_id = ['You cannot assign a role with permissions you do not have'];
-              } else {
-                updateData.role_id = role_id;
-              }
-            }
-          } else {
-            // Self-edit with same role - no validation needed
-            updateData.role_id = role_id;
-          }
-        }
-      } else {
-        errors.role_id = ['Role is required - cannot remove role'];
-      }
-    }
-
-    // Validate status if provided
-    if (status !== undefined) {
-      const validStatuses = ['active', 'disabled', 'blocked'];
-      if (!validStatuses.includes(status)) {
-        errors.status = ['Invalid status'];
-      } else {
-        updateData.status = status;
-      }
-    }
-
-    // Validate password if provided
     if (password !== undefined) {
       if (!password) {
         errors.password = ['Password cannot be empty'];
@@ -468,7 +499,6 @@ users.put('/:id', async (c) => {
         if (!passwordValidation.isValid) {
           errors.password = passwordValidation.errors;
         } else {
-          // Hash new password
           const pepper = process.env.APPLICATION_SECRET;
           if (!pepper) {
             console.error('🔴 SECURITY WARNING: APPLICATION_SECRET not set!');
@@ -481,6 +511,46 @@ users.put('/:id', async (c) => {
       }
     }
 
+    // Handle namespace-specific updates
+    const namespaceUpdateData = {};
+
+    // Validate role_id if provided (namespace-specific)
+    if (effectiveRoleId !== undefined) {
+      if (effectiveRoleId) {
+        const Role = (await import('../models/Role.js')).Role;
+        const availableRoles = await Role.getAvailableInNamespace(currentNamespace.id);
+        const roleExists = availableRoles.find(r => r.id === effectiveRoleId);
+        
+        if (!roleExists) {
+          errors.role_id = ['Role not available in this namespace'];
+        } else {
+          const canAssignRoles = await User.hasPermissionInNamespace(currentUser.id, 'user_role_assign', currentNamespace.id);
+          if (!canAssignRoles) {
+            errors.role_id = ['You do not have permission to assign user roles'];
+          } else {
+            const canAssign = await PermissionHelper.canAssignRoleInNamespace(currentUser.id, effectiveRoleId, currentNamespace.id);
+            if (!canAssign) {
+              errors.role_id = ['You cannot assign a role with permissions you do not have'];
+            } else {
+              namespaceUpdateData.role_id = effectiveRoleId;
+            }
+          }
+        }
+      } else {
+        errors.role_id = ['Role is required'];
+      }
+    }
+
+    // Validate status if provided
+    if (effectiveStatus !== undefined) {
+      const validStatuses = ['active', 'disabled', 'blocked'];
+      if (!validStatuses.includes(effectiveStatus)) {
+        errors.status = ['Invalid status'];
+      } else {
+        updateData.status = effectiveStatus;
+      }
+    }
+
     if (Object.keys(errors).length > 0) {
       return c.json(
         apiResponse.validation(errors),
@@ -488,22 +558,42 @@ users.put('/:id', async (c) => {
       );
     }
 
-    if (Object.keys(updateData).length === 0) {
-      return c.json(
-        apiResponse.validation({
-          update: ['No valid fields to update']
-        }),
-        400
-      );
-    }
+    // Update user and namespace-specific data in transaction
+    await db.transaction(async (trx) => {
+      // Update basic user data if there are changes
+      if (Object.keys(updateData).length > 0) {
+        await trx('users').where('id', userId).update({
+          ...updateData,
+          updated_at: new Date()
+        });
+      }
 
-    // Update user
-    await User.update(userId, updateData);
+      // Update namespace-specific role if changed
+      if (namespaceUpdateData.role_id) {
+        await trx('user_namespace_roles')
+          .where({ user_id: userId, namespace_id: currentNamespace.id })
+          .update({
+            role_id: namespaceUpdateData.role_id,
+            updated_at: new Date()
+          });
+      }
+    });
+
     const updatedUser = await User.findById(userId);
+    const userRole = await UserNamespaceRole.getRoleForUser(userId, currentNamespace.id);
 
     return c.json(
       apiResponse.success({
-        user: updatedUser.toJSON()
+        user: {
+          ...updatedUser.toJSON(),
+          role_id: userRole?.id,
+          role_name: userRole?.name,
+          role_display_name: userRole?.display_name
+        },
+        namespace: {
+          id: currentNamespace.id,
+          name: currentNamespace.name
+        }
       }, 'User updated successfully'),
       200
     );
@@ -518,199 +608,12 @@ users.put('/:id', async (c) => {
 });
 
 /**
- * GET /api/users/:id/permissions - Get user permissions (role + direct)
- * Requires user_permissions_view permission + hierarchical validation
- */
-users.get('/:id/permissions', requirePermission('user_permissions_view'), async (c) => {
-  try {
-    const userId = c.req.param('id');
-    
-    if (!userId || typeof userId !== 'string' || userId.length < 10) {
-      return c.json(
-        apiResponse.validation({ id: ['Invalid user ID'] }),
-        400
-      );
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return c.json(
-        apiResponse.error('User not found'),
-        404
-      );
-    }
-
-    // Check if current user can manage target user (permission superset)
-    const { user: currentUser } = getAuthData(c);
-    const canManage = await PermissionHelper.canManageUser(currentUser.id, userId);
-    if (!canManage) {
-      return c.json(
-        apiResponse.forbidden('You cannot view permissions of users with more permissions than your own'),
-        403
-      );
-    }
-
-    // Get all permissions with their source (role or direct)
-    const allPermissions = await User.getPermissions(userId);
-    
-    // Get role permissions separately
-    const rolePermissions = await User.getRolePermissions(userId);
-    const directPermissions = await User.getDirectPermissions(userId);
-    
-    return c.json(
-      apiResponse.success({
-        permissions: allPermissions,
-        rolePermissions: rolePermissions,
-        directPermissions: directPermissions
-      }, 'User permissions retrieved successfully'),
-      200
-    );
-
-  } catch (error) {
-    console.error('Get user permissions error:', error);
-    return c.json(
-      apiResponse.error('Failed to retrieve user permissions'),
-      500
-    );
-  }
-});
-
-/**
- * PUT /api/users/:id/permissions - Update user direct permissions
- * Requires user_permissions_edit permission + hierarchical validation
- */
-users.put('/:id/permissions', requirePermission('user_permissions_edit'), async (c) => {
-  try {
-    const userId = c.req.param('id');
-    const { permissions = [] } = await c.req.json();
-    
-    if (!userId || typeof userId !== 'string' || userId.length < 10) {
-      return c.json(
-        apiResponse.validation({ id: ['Invalid user ID'] }),
-        400
-      );
-    }
-
-    if (!Array.isArray(permissions)) {
-      return c.json(
-        apiResponse.validation({ permissions: ['Permissions must be an array'] }),
-        400
-      );
-    }
-
-    const user = await User.findById(userId);
-    if (!user) {
-      return c.json(
-        apiResponse.error('User not found'),
-        404
-      );
-    }
-
-    // Check if user is trying to edit their own permissions
-    const { user: currentUser } = getAuthData(c);
-    if (currentUser.id === userId) {
-      return c.json(
-        apiResponse.forbidden('You cannot edit your own permissions'),
-        403
-      );
-    }
-
-    // Check if current user can manage target user (permission superset)
-    const canManage = await PermissionHelper.canManageUser(currentUser.id, userId);
-    if (!canManage) {
-      return c.json(
-        apiResponse.forbidden('You cannot edit permissions of users with more permissions than your own'),
-        403
-      );
-    }
-
-    // Validate permission assignment
-    const validation = await PermissionHelper.validatePermissionAssignment(currentUser.id, permissions);
-    if (!validation.valid) {
-      return c.json(
-        apiResponse.validation({
-          permissions: [validation.message]
-        }),
-        403
-      );
-    }
-    
-    // Additional check: Ensure the resulting permissions (role + direct) won't exceed actor's permissions
-    const targetRolePermissions = await User.getRolePermissions(userId);
-    const targetRolePermissionIds = new Set(targetRolePermissions.map(p => p.id));
-    
-    // Calculate what the target user's total permissions would be
-    const totalTargetPermissionIds = new Set([
-      ...targetRolePermissionIds,
-      ...permissions
-    ]);
-    
-    // Get actor's total permissions
-    const actorPermissions = await User.getPermissions(currentUser.id);
-    
-    // Check if target would have equal or more permissions than actor
-    if (totalTargetPermissionIds.size >= actorPermissions.length) {
-      return c.json(
-        apiResponse.validation({
-          permissions: ['The resulting permissions would equal or exceed your own permissions']
-        }),
-        403
-      );
-    }
-    
-    // Check if target would have any permission that actor doesn't have
-    const actorPermissionIds = new Set(actorPermissions.map(p => p.id));
-    const hasUnauthorizedPermission = [...totalTargetPermissionIds].some(
-      permId => !actorPermissionIds.has(permId)
-    );
-    
-    if (hasUnauthorizedPermission) {
-      return c.json(
-        apiResponse.validation({
-          permissions: ['The resulting permissions would include permissions you do not have']
-        }),
-        403
-      );
-    }
-
-    // Note: We don't validate role permissions here since the frontend 
-    // only sends direct permissions (excluding role permissions)
-
-    // Get only the additional permissions (not covered by role)
-    const rolePermissions = await User.getRolePermissions(userId);
-    const rolePermissionIds = rolePermissions.map(p => p.id);
-    const additionalPermissions = permissions.filter(permId => !rolePermissionIds.includes(permId));
-
-    // Sync only the additional permissions
-    await User.syncPermissions(userId, additionalPermissions);
-    
-    // Get updated permissions
-    const updatedPermissions = await User.getPermissions(userId);
-    const directPermissions = await User.getDirectPermissions(userId);
-
-    return c.json(
-      apiResponse.success({
-        permissions: updatedPermissions,
-        directPermissions: directPermissions
-      }, 'User permissions updated successfully'),
-      200
-    );
-
-  } catch (error) {
-    console.error('Update user permissions error:', error);
-    return c.json(
-      apiResponse.error('Failed to update user permissions'),
-      500
-    );
-  }
-});
-
-/**
- * DELETE /api/users/:id - Delete user
+ * DELETE /api/users/:id - Remove user from current namespace
  */
 users.delete('/:id', requirePermission('user_delete'), async (c) => {
   try {
     const userId = c.req.param('id');
+    const currentNamespace = c.get('currentNamespace');
     const { user: currentUser } = getAuthData(c);
 
     if (!userId || typeof userId !== 'string' || userId.length < 10) {
@@ -728,7 +631,15 @@ users.delete('/:id', requirePermission('user_delete'), async (c) => {
       );
     }
 
-    // Find user to delete
+    // Check if user exists in current namespace
+    const userInNamespace = await UserNamespaceRole.findByUserAndNamespace(userId, currentNamespace.id);
+    if (!userInNamespace) {
+      return c.json(
+        apiResponse.error('User not found in this namespace'),
+        404
+      );
+    }
+
     const userToDelete = await User.findById(userId);
     if (!userToDelete) {
       return c.json(
@@ -737,30 +648,22 @@ users.delete('/:id', requirePermission('user_delete'), async (c) => {
       );
     }
 
-    // Check if current user can manage target user (permission superset)
-    const canManage = await PermissionHelper.canManageUser(currentUser.id, userId);
+    // Check if current user can manage target user in this namespace
+    const canManage = await PermissionHelper.canManageUserInNamespace(currentUser.id, userId, currentNamespace.id);
     if (!canManage) {
       return c.json(
-        apiResponse.forbidden('You cannot delete users with equal or more permissions than your own'),
+        apiResponse.forbidden('You cannot delete users with equal or more permissions than your own in this namespace'),
         403
       );
     }
 
-    // Only allow deletion of disabled users
-    if (userToDelete.status !== 'disabled') {
-      return c.json(
-        apiResponse.forbidden('Only disabled users can be deleted. Please disable the user first.'),
-        403
-      );
-    }
-
-    // Delete user
-    await User.delete(userId);
+    // Remove user from current namespace (not global deletion)
+    await UserNamespaceRole.delete(userId, currentNamespace.id);
 
     return c.json(
       apiResponse.success(
         null,
-        'User deleted successfully'
+        'User removed from namespace successfully'
       ),
       200
     );
@@ -768,54 +671,183 @@ users.delete('/:id', requirePermission('user_delete'), async (c) => {
   } catch (error) {
     console.error('Delete user error:', error);
     return c.json(
-      apiResponse.error('Failed to delete user'),
+      apiResponse.error('Failed to remove user from namespace'),
       500
     );
   }
 });
 
 /**
- * GET /api/users/:id/can-edit - Check if current user can edit target user
- * Used for modal permission validation
+ * GET /api/users/:id/permissions - Get user permissions in current namespace
  */
-users.get('/:id/can-edit', requirePermission('user_permissions_view'), async (c) => {
+users.get('/:id/permissions', requirePermission('user_permissions_view'), async (c) => {
   try {
-    const targetUserId = c.req.param('id');
-    const currentUser = c.get('user');
-
-    if (!security.validateInput(targetUserId, 'uuid')) {
-      return c.json(apiResponse.error('Invalid user ID'), 400);
-    }
-
-    const targetUser = await User.findById(targetUserId);
-    if (!targetUser) {
-      return c.json(apiResponse.error('User not found'), 404);
-    }
-
-    // Check if current user can manage target user
-    const isSelf = currentUser.id === targetUserId;
-    const canEdit = isSelf || await PermissionHelper.canManageUser(currentUser.id, targetUserId);
+    const userId = c.req.param('id');
+    const currentNamespace = c.get('currentNamespace');
     
-    // Check if target user has more permissions (for role dropdown disabling)
-    // For self-edit, always disable role dropdown (can't change own role)
-    const hasMorePermissions = isSelf || !await PermissionHelper.canManageUser(currentUser.id, targetUserId);
-    const currentUserPermissions = await User.getPermissions(currentUser.id);
-    const targetUserPermissions = await User.getPermissions(targetUserId);
+    if (!userId || typeof userId !== 'string' || userId.length < 10) {
+      return c.json(
+        apiResponse.validation({ id: ['Invalid user ID'] }),
+        400
+      );
+    }
+
+    // Check if user exists in current namespace
+    const userInNamespace = await UserNamespaceRole.findByUserAndNamespace(userId, currentNamespace.id);
+    if (!userInNamespace) {
+      return c.json(
+        apiResponse.error('User not found in this namespace'),
+        404
+      );
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return c.json(
+        apiResponse.error('User not found'),
+        404
+      );
+    }
+
+    // Check if current user can manage target user in this namespace
+    const { user: currentUser } = getAuthData(c);
+    const canManage = await PermissionHelper.canManageUserInNamespace(currentUser.id, userId, currentNamespace.id);
+    if (!canManage) {
+      return c.json(
+        apiResponse.forbidden('You cannot view permissions of users with more permissions than your own in this namespace'),
+        403
+      );
+    }
+
+    // Get user's permissions in current namespace (role-based only)
+    const userRole = await UserNamespaceRole.getRoleForUser(userId, currentNamespace.id);
+    let permissions = [];
+    
+    if (userRole) {
+      permissions = await db('permissions')
+        .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
+        .where('role_permissions.role_id', userRole.id)
+        .select('permissions.*');
+    }
     
     return c.json(
       apiResponse.success({
-        can_edit: canEdit,
-        has_more_permissions: hasMorePermissions,
-        current_user_permission_count: currentUserPermissions.length,
-        target_user_permission_count: targetUserPermissions.length
-      }, 'Permission check completed'),
+        permissions: permissions,
+        role: userRole,
+        namespace: {
+          id: currentNamespace.id,
+          name: currentNamespace.name
+        }
+      }, 'User permissions retrieved successfully'),
       200
     );
 
   } catch (error) {
-    console.error('Check user edit permission error:', error);
+    console.error('Get user permissions error:', error);
     return c.json(
-      apiResponse.error('Failed to check edit permissions'),
+      apiResponse.error('Failed to retrieve user permissions'),
+      500
+    );
+  }
+});
+
+/**
+ * POST /api/users/:id/assign-to-namespace - Assign existing user to namespace
+ */
+users.post('/:id/assign-to-namespace', requirePermission('user_create'), async (c) => {
+  try {
+    const userId = c.req.param('id');
+    const currentNamespace = c.get('currentNamespace');
+    const { user: currentUser } = getAuthData(c);
+    const { role_id } = await c.req.json();
+
+    if (!userId || typeof userId !== 'string' || userId.length < 10) {
+      return c.json(
+        apiResponse.validation({ id: ['Invalid user ID'] }),
+        400
+      );
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return c.json(
+        apiResponse.error('User not found'),
+        404
+      );
+    }
+
+    // Check if user is already in this namespace
+    const existingAssignment = await UserNamespaceRole.exists(userId, currentNamespace.id);
+    if (existingAssignment) {
+      return c.json(
+        apiResponse.validation({
+          user: ['User is already assigned to this namespace']
+        }),
+        400
+      );
+    }
+
+    // Validate role
+    if (!role_id) {
+      return c.json(
+        apiResponse.validation({ role_id: ['Role is required'] }),
+        400
+      );
+    }
+
+    const Role = (await import('../models/Role.js')).Role;
+    const availableRoles = await Role.getAvailableInNamespace(currentNamespace.id);
+    const roleExists = availableRoles.find(r => r.id === role_id);
+    
+    if (!roleExists) {
+      return c.json(
+        apiResponse.validation({ role_id: ['Role not available in this namespace'] }),
+        400
+      );
+    }
+
+    // Check permissions
+    const canAssignRoles = await User.hasPermissionInNamespace(currentUser.id, 'user_role_assign', currentNamespace.id);
+    if (!canAssignRoles) {
+      return c.json(
+        apiResponse.forbidden('You do not have permission to assign user roles'),
+        403
+      );
+    }
+
+    const canAssign = await PermissionHelper.canAssignRoleInNamespace(currentUser.id, role_id, currentNamespace.id);
+    if (!canAssign) {
+      return c.json(
+        apiResponse.forbidden('You cannot assign a role with permissions you do not have'),
+        403
+      );
+    }
+
+    // Assign user to namespace
+    await UserNamespaceRole.create(userId, currentNamespace.id, role_id);
+
+    const userRole = await UserNamespaceRole.getRoleForUser(userId, currentNamespace.id);
+
+    return c.json(
+      apiResponse.success({
+        user: {
+          ...user.toJSON(),
+          role_id: userRole?.id,
+          role_name: userRole?.name,
+          role_display_name: userRole?.display_name
+        },
+        namespace: {
+          id: currentNamespace.id,
+          name: currentNamespace.name
+        }
+      }, 'User assigned to namespace successfully'),
+      201
+    );
+
+  } catch (error) {
+    console.error('Assign user to namespace error:', error);
+    return c.json(
+      apiResponse.error('Failed to assign user to namespace'),
       500
     );
   }

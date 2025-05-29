@@ -82,40 +82,10 @@ class User {
   }
 
   static async getPermissions(userId) {
-    const rolePermissions = await db('permissions')
-      .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
-      .join('users', 'role_permissions.role_id', 'users.role_id')
-      .where('users.id', userId)
-      .select('permissions.*');
-
-    const directPermissions = await db('permissions')
-      .join('user_permissions', 'permissions.id', 'user_permissions.permission_id')
-      .where('user_permissions.user_id', userId)
-      .select('permissions.*');
-
-    const allPermissions = [...rolePermissions, ...directPermissions];
-    const uniquePermissions = allPermissions.reduce((acc, perm) => {
-      if (!acc.find(p => p.id === perm.id)) {
-        acc.push(perm);
-      }
-      return acc;
-    }, []);
-
-    return uniquePermissions;
-  }
-
-  static async getRolePermissions(userId) {
     return await db('permissions')
       .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
       .join('users', 'role_permissions.role_id', 'users.role_id')
       .where('users.id', userId)
-      .select('permissions.*');
-  }
-
-  static async getDirectPermissions(userId) {
-    return await db('permissions')
-      .join('user_permissions', 'permissions.id', 'user_permissions.permission_id')
-      .where('user_permissions.user_id', userId)
       .select('permissions.*');
   }
 
@@ -127,54 +97,7 @@ class User {
       .where('permissions.name', permissionName)
       .first();
 
-    if (rolePermission) return true;
-
-    const directPermission = await db('permissions')
-      .join('user_permissions', 'permissions.id', 'user_permissions.permission_id')
-      .where('user_permissions.user_id', userId)
-      .where('permissions.name', permissionName)
-      .first();
-
-    return !!directPermission;
-  }
-
-  static async assignPermission(userId, permissionId) {
-    try {
-      await db('user_permissions').insert({
-        user_id: userId,
-        permission_id: permissionId
-      });
-      return true;
-    } catch (error) {
-      if (error.code === 'ER_DUP_ENTRY') {
-        return false;
-      }
-      throw error;
-    }
-  }
-
-  static async removePermission(userId, permissionId) {
-    const deleted = await db('user_permissions')
-      .where({
-        user_id: userId,
-        permission_id: permissionId
-      })
-      .del();
-    return deleted > 0;
-  }
-
-  static async syncPermissions(userId, permissionIds) {
-    await db.transaction(async (trx) => {
-      await trx('user_permissions').where('user_id', userId).del();
-      
-      if (permissionIds.length > 0) {
-        const inserts = permissionIds.map(permissionId => ({
-          user_id: userId,
-          permission_id: permissionId
-        }));
-        await trx('user_permissions').insert(inserts);
-      }
-    });
+    return !!rolePermission;
   }
 
   static async assignRole(userId, roleId) {
@@ -185,6 +108,98 @@ class User {
         updated_at: new Date()
       });
     return this.findById(userId);
+  }
+
+  // Namespace-aware methods for multi-tenancy
+
+  async getRoleInNamespace(namespaceId) {
+    const result = await db('user_namespace_roles')
+      .join('roles', 'user_namespace_roles.role_id', 'roles.id')
+      .where('user_namespace_roles.user_id', this.id)
+      .where('user_namespace_roles.namespace_id', namespaceId)
+      .select('roles.*')
+      .first();
+    
+    return result || null;
+  }
+
+  async getNamespaces() {
+    const results = await db('user_namespace_roles')
+      .join('namespaces', 'user_namespace_roles.namespace_id', 'namespaces.id')
+      .join('roles', 'user_namespace_roles.role_id', 'roles.id')
+      .where('user_namespace_roles.user_id', this.id)
+      .select(
+        'namespaces.id as namespace_id',
+        'namespaces.name as namespace_name', 
+        'namespaces.full_path as namespace_full_path',
+        'roles.id as role_id',
+        'roles.name as role_name',
+        'roles.display_name as role_display_name'
+      );
+
+    return results.map(row => ({
+      namespace: {
+        id: row.namespace_id,
+        name: row.namespace_name,
+        full_path: row.namespace_full_path
+      },
+      role: {
+        id: row.role_id,
+        name: row.role_name,
+        display_name: row.role_display_name
+      }
+    }));
+  }
+
+  async assignToNamespace(namespaceId, roleId) {
+    try {
+      await db('user_namespace_roles').insert({
+        user_id: this.id,
+        namespace_id: namespaceId,
+        role_id: roleId
+      });
+      return true;
+    } catch (error) {
+      if (error.code === 'ER_DUP_ENTRY') {
+        // Update existing assignment
+        await db('user_namespace_roles')
+          .where({
+            user_id: this.id,
+            namespace_id: namespaceId
+          })
+          .update({
+            role_id: roleId
+          });
+        return true;
+      }
+      throw error;
+    }
+  }
+
+  async hasPermissionInNamespace(permissionName, namespaceId) {
+    const permission = await db('permissions')
+      .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
+      .join('roles', 'role_permissions.role_id', 'roles.id')
+      .join('user_namespace_roles', 'roles.id', 'user_namespace_roles.role_id')
+      .where('user_namespace_roles.user_id', this.id)
+      .where('user_namespace_roles.namespace_id', namespaceId)
+      .where('permissions.name', permissionName)
+      .first();
+
+    return !!permission;
+  }
+
+  static async hasPermissionInNamespace(userId, permissionName, namespaceId) {
+    const permission = await db('permissions')
+      .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
+      .join('roles', 'role_permissions.role_id', 'roles.id')
+      .join('user_namespace_roles', 'roles.id', 'user_namespace_roles.role_id')
+      .where('user_namespace_roles.user_id', userId)
+      .where('user_namespace_roles.namespace_id', namespaceId)
+      .where('permissions.name', permissionName)
+      .first();
+
+    return !!permission;
   }
 
   // Update password

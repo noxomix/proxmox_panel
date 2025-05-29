@@ -6,23 +6,34 @@ import { apiResponse } from '../utils/response.js';
 import { security } from '../utils/security.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
+import { namespaceMiddleware, requireNamespace } from '../middleware/namespace.js';
 import { PermissionHelper } from '../utils/permissionHelper.js';
 
 const roleController = new Hono();
 
 roleController.use('*', authMiddleware);
+roleController.use('*', namespaceMiddleware);
+roleController.use('*', requireNamespace);
 
 /**
- * GET /api/roles/assignable - Get roles that current user can assign to others
+ * GET /api/roles/assignable - Get roles that current user can assign to others in current namespace
  * Different from general list - only returns roles with permission subset logic
  */
 roleController.get('/assignable', requirePermission('user_role_assign'), async (c) => {
     try {
         const currentUser = c.get('user');
-        const assignableRoles = await PermissionHelper.getAssignableRoles(currentUser.id);
+        const currentNamespace = c.get('currentNamespace');
+        const assignableRoles = await PermissionHelper.getAssignableRolesInNamespace(currentUser.id, currentNamespace.id);
         
         return c.json(
-            apiResponse.success({ roles: assignableRoles }, 'Assignable roles retrieved successfully'),
+            apiResponse.success({ 
+                roles: assignableRoles,
+                namespace: {
+                    id: currentNamespace.id,
+                    name: currentNamespace.name,
+                    full_path: currentNamespace.full_path
+                }
+            }, 'Assignable roles retrieved successfully'),
             200
         );
     } catch (error) {

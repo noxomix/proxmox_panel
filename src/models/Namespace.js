@@ -182,6 +182,116 @@ class Namespace {
     
     return true;
   }
+
+  // Namespace-aware user and role management methods
+
+  static async getUsersWithRoles(namespaceId) {
+    return await db('user_namespace_roles')
+      .join('users', 'user_namespace_roles.user_id', 'users.id')
+      .join('roles', 'user_namespace_roles.role_id', 'roles.id')
+      .where('user_namespace_roles.namespace_id', namespaceId)
+      .select(
+        'users.id as user_id',
+        'users.name as user_name',
+        'users.username',
+        'users.email',
+        'users.status',
+        'roles.id as role_id',
+        'roles.name as role_name',
+        'roles.display_name as role_display_name'
+      )
+      .orderBy('users.name');
+  }
+
+  static async getAvailableRoles(namespaceId) {
+    // Get target namespace for inheritance calculation
+    const targetNamespace = await this.findById(namespaceId);
+    if (!targetNamespace) {
+      return [];
+    }
+
+    return await db('roles')
+      .leftJoin('namespaces as origin_ns', 'roles.origin_namespace_id', 'origin_ns.id')
+      .where(function() {
+        this.where('roles.origin_namespace_id', namespaceId) // Own roles
+          .orWhere(function() {
+            // Inherited roles - role's origin is ancestor of target namespace
+            this.whereRaw('? LIKE CONCAT(origin_ns.full_path, "/%")', [targetNamespace.full_path])
+              .orWhere('origin_ns.parent_id', null); // Root namespace roles
+          });
+      })
+      .select('roles.*', 'origin_ns.name as origin_namespace_name', 'origin_ns.full_path as origin_namespace_path')
+      .orderBy('roles.name');
+  }
+
+  static async getAncestorRoles(namespaceId) {
+    const ancestors = await this.getAncestors(namespaceId);
+    const ancestorIds = ancestors.map(ancestor => ancestor.id);
+    
+    if (ancestorIds.length === 0) {
+      return [];
+    }
+
+    return await db('roles')
+      .leftJoin('namespaces as origin_ns', 'roles.origin_namespace_id', 'origin_ns.id')
+      .whereIn('roles.origin_namespace_id', ancestorIds)
+      .select('roles.*', 'origin_ns.name as origin_namespace_name', 'origin_ns.full_path as origin_namespace_path')
+      .orderBy('roles.name');
+  }
+
+  static async copyUsersFromParent(namespaceId) {
+    const namespace = await this.findById(namespaceId);
+    if (!namespace || !namespace.parent_id) {
+      throw new Error('Namespace not found or has no parent');
+    }
+
+    // Get all users from parent namespace
+    const parentUsers = await this.getUsersWithRoles(namespace.parent_id);
+    
+    if (parentUsers.length === 0) {
+      return { copied: 0, skipped: 0, errors: [] };
+    }
+
+    let copied = 0;
+    let skipped = 0;
+    const errors = [];
+
+    await db.transaction(async (trx) => {
+      for (const user of parentUsers) {
+        try {
+          // Check if user already exists in target namespace
+          const existing = await trx('user_namespace_roles')
+            .where({
+              user_id: user.user_id,
+              namespace_id: namespaceId
+            })
+            .first();
+
+          if (existing) {
+            skipped++;
+            continue;
+          }
+
+          // Copy user with same role to target namespace
+          await trx('user_namespace_roles').insert({
+            user_id: user.user_id,
+            namespace_id: namespaceId,
+            role_id: user.role_id
+          });
+
+          copied++;
+        } catch (error) {
+          errors.push({
+            user_id: user.user_id,
+            user_name: user.user_name,
+            error: error.message
+          });
+        }
+      }
+    });
+
+    return { copied, skipped, errors };
+  }
 }
 
 export default Namespace;

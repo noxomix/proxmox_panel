@@ -12,8 +12,8 @@
         >
           <div class="flex items-center min-w-0">
             <FolderIcon 
-              className="w-4 h-4 text-brand-600 dark:text-brand-400 mr-2 flex-shrink-0" 
-              style="fill: currentColor"
+              :className="`w-4 h-4 mr-2 flex-shrink-0 ${currentNamespaceId ? 'text-brand-600 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400'}`"
+              :style="currentNamespaceId ? 'fill: currentColor' : ''"
             />
             <span 
               v-if="!sidebarCollapsed" 

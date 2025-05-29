@@ -10,8 +10,27 @@ export class Role {
         return await db('roles').where('name', name).first();
     }
 
-    static async findAll() {
-        return await db('roles').orderBy('name');
+    static async findAll(namespaceId = null) {
+        let query = db('roles');
+        
+        if (namespaceId) {
+            // Show roles available in this namespace (inherited + own)
+            query = query.leftJoin('namespaces as origin_ns', 'roles.origin_namespace_id', 'origin_ns.id')
+                .leftJoin('namespaces as target_ns', function() {
+                    this.on('target_ns.id', '=', db.raw('?', [namespaceId]));
+                })
+                .where(function() {
+                    this.where('roles.origin_namespace_id', namespaceId) // Own roles
+                        .orWhere(function() {
+                            // Inherited roles - role's origin is ancestor of target namespace
+                            this.whereRaw('target_ns.full_path LIKE CONCAT(origin_ns.full_path, "/%")')
+                                .orWhere('origin_ns.parent_id', null); // Root namespace roles
+                        });
+                })
+                .select('roles.*', 'origin_ns.name as origin_namespace_name', 'origin_ns.full_path as origin_namespace_path');
+        }
+        
+        return await query.orderBy('name');
     }
 
     static async create(data) {
@@ -137,5 +156,53 @@ export class Role {
     static async getAssignableRoles(currentUserRoleName) {
         const allRoles = await this.findAll();
         return ROLE_CONFIG.getAssignableRoles(currentUserRoleName, allRoles);
+    }
+
+    // Namespace-aware methods for multi-tenancy
+
+    static async getAvailableInNamespace(namespaceId) {
+        // Get target namespace for inheritance calculation
+        const targetNamespace = await db('namespaces').where('id', namespaceId).first();
+        if (!targetNamespace) {
+            return [];
+        }
+
+        return await db('roles')
+            .leftJoin('namespaces as origin_ns', 'roles.origin_namespace_id', 'origin_ns.id')
+            .where(function() {
+                this.where('roles.origin_namespace_id', namespaceId) // Own roles
+                    .orWhere(function() {
+                        // Inherited roles - role's origin is ancestor of target namespace
+                        this.whereRaw('? LIKE CONCAT(origin_ns.full_path, "/%")', [targetNamespace.full_path])
+                            .orWhere('origin_ns.parent_id', null); // Root namespace roles
+                    });
+            })
+            .select('roles.*', 'origin_ns.name as origin_namespace_name', 'origin_ns.full_path as origin_namespace_path')
+            .orderBy('roles.name');
+    }
+
+    static async isEditableInNamespace(roleId, namespaceId) {
+        const role = await this.findById(roleId);
+        if (!role) {
+            return false;
+        }
+
+        // Role is editable only in its origin namespace
+        return role.origin_namespace_id === namespaceId;
+    }
+
+    async getOriginNamespace() {
+        if (!this.origin_namespace_id) {
+            return null;
+        }
+
+        return await db('namespaces')
+            .where('id', this.origin_namespace_id)
+            .first();
+    }
+
+    // Instance method to check if role is editable in namespace
+    async isEditableInNamespace(namespaceId) {
+        return Role.isEditableInNamespace(this.id, namespaceId);
     }
 }

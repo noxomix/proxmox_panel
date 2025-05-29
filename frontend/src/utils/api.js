@@ -1,3 +1,5 @@
+import { currentNamespaceId } from '../stores/namespace.js';
+
 class ApiClient {
   constructor(baseURL = '/api') {
     this.baseURL = baseURL;
@@ -18,7 +20,7 @@ class ApiClient {
     localStorage.removeItem('auth_token');
   }
 
-  // Build headers with optional auth token
+  // Build headers with optional auth token and namespace ID
   buildHeaders(customHeaders = {}) {
     const headers = {
       'Content-Type': 'application/json',
@@ -28,6 +30,11 @@ class ApiClient {
     const token = this.getToken();
     if (token) {
       headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Add namespace header if current namespace is set
+    if (currentNamespaceId.value) {
+      headers['X-Namespace-ID'] = currentNamespaceId.value;
     }
 
     return headers;
@@ -58,7 +65,10 @@ class ApiClient {
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.message || 'Request failed');
+        // Create error with response data attached
+        const error = new Error(data.message || 'Request failed');
+        error.response = { data, status: response.status };
+        throw error;
       }
 
       return data;
