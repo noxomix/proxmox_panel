@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import bcrypt from 'bcrypt';
+import { v7 as uuidv7 } from 'uuid';
 
 /**
  * @param { import("knex").Knex } knex
@@ -32,6 +33,7 @@ export const seed = async function(knex) {
   const users = [
     // Admin user - German
     {
+      id: uuidv7(),
       name: 'Theo',
       username: 'theo',
       email: 'theo@example.com',
@@ -42,6 +44,7 @@ export const seed = async function(knex) {
     // Customer users for avatar testing with international names
     // A-F = Giraffe - Estonian (Jaan Tamm equivalent)
     {
+      id: uuidv7(),
       name: 'Anti Tamm',
       username: 'anti',
       email: 'anti@customer.com',
@@ -51,6 +54,7 @@ export const seed = async function(knex) {
     },
     // G-L = Pinguin - Moldovan (Ion Popescu equivalent)
     {
+      id: uuidv7(),
       name: 'Ion Popescu',
       username: 'ion',
       email: 'ion@customer.com',
@@ -60,6 +64,7 @@ export const seed = async function(knex) {
     },
     // M-R = Wombat - Portuguese (João Silva equivalent)
     {
+      id: uuidv7(),
       name: 'Manuel Silva',
       username: 'manuel',
       email: 'manuel@customer.com',
@@ -69,6 +74,7 @@ export const seed = async function(knex) {
     },
     // S-Z = Gorilla - Ghanaian (Kwame Asante equivalent)
     {
+      id: uuidv7(),
       name: 'Samuel Asante',
       username: 'samuel',
       email: 'samuel@customer.com',
@@ -78,6 +84,7 @@ export const seed = async function(knex) {
     },
     // Extra user - Uruguayan (Juan Pérez equivalent)
     {
+      id: uuidv7(),
       name: 'Carlos Pérez',
       username: 'carlos',
       email: 'carlos@customer.com',
@@ -87,6 +94,7 @@ export const seed = async function(knex) {
     },
     // Extra user - Slovak (Ján Novák equivalent)
     {
+      id: uuidv7(),
       name: 'Ján Novák',
       username: 'jan',
       email: 'jan@customer.com',

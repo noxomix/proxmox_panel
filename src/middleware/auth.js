@@ -5,6 +5,7 @@ import Namespace from '../models/Namespace.js';
 import UserNamespaceRole from '../models/UserNamespaceRole.js';
 import { jwtUtils } from '../utils/jwt.js';
 import { apiResponse } from '../utils/response.js';
+import NamespaceHelper from '../utils/namespaceHelper.js';
 
 export async function authMiddleware(c, next) {
   try {
@@ -42,53 +43,50 @@ export async function authMiddleware(c, next) {
     let currentNamespace = null;
     let currentRole = null;
     
-    // 1. Try X-Namespace-ID header first
-    const namespaceHeader = c.req.header('X-Namespace-ID');
-    if (namespaceHeader) {
-      currentNamespace = await Namespace.findById(namespaceHeader);
-      
-      if (currentNamespace) {
-        // Get user's role in this namespace
-        const userRole = await UserNamespaceRole.getRoleForUser(user.id, currentNamespace.id);
-        if (userRole) {
-          currentRole = userRole;
-        } else {
-          return c.json(apiResponse.forbidden('User has no access to this namespace'), 403);
-        }
-      } else {
-        return c.json(apiResponse.validation({ namespace: ['Invalid namespace ID'] }), 400);
-      }
-    } else {
-      // 2. Try domain-based namespace detection
-      const host = c.req.header('Host');
-      if (host) {
-        const domain = host.split(':')[0]; // Remove port if present
-        const domainNamespace = await db('namespaces').where('domain', domain).first();
+    try {
+      // 1. Check for explicit X-Namespace-ID header first
+      const namespaceHeader = c.req.header('X-Namespace-ID');
+      if (namespaceHeader) {
+        console.log('Trying namespace from header:', namespaceHeader);
+        const headerNamespace = await db('namespaces').where('id', namespaceHeader).first();
         
-        if (domainNamespace) {
-          currentNamespace = domainNamespace;
-          const userRole = await UserNamespaceRole.getRoleForUser(user.id, currentNamespace.id);
+        if (headerNamespace) {
+          const userRole = await UserNamespaceRole.getRoleForUser(user.id, headerNamespace.id);
           if (userRole) {
+            currentNamespace = headerNamespace;
             currentRole = userRole;
+            console.log('Using namespace from header:', currentNamespace.name);
           }
         }
       }
       
-      // 3. Fallback to root namespace if user has access
+      // 2. If no header or invalid header, get namespace with lowest depth (root)
       if (!currentNamespace) {
+        console.log('No valid namespace from header, getting root namespace...');
         const rootNamespace = await db('namespaces')
-          .where({ parent_id: null })
+          .orderBy('depth', 'asc')
           .first();
           
+        console.log('Found root namespace:', rootNamespace);
+        
         if (rootNamespace) {
           const userRole = await UserNamespaceRole.getRoleForUser(user.id, rootNamespace.id);
+          console.log('User role in root namespace:', userRole);
+          
           if (userRole) {
             currentNamespace = rootNamespace;
             currentRole = userRole;
+            console.log('Using root namespace:', currentNamespace.name);
           }
         }
       }
+    } catch (error) {
+      console.error('Namespace resolution error in auth middleware:', error);
+      currentNamespace = null;
+      currentRole = null;
     }
+    
+    console.log('Final currentNamespace:', currentNamespace);
 
     // Store user info with namespace context in context
     c.set('user', user);

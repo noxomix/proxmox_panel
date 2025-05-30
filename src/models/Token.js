@@ -30,12 +30,14 @@ class Token {
   }
 
   static async create(userId, type = 'session', expiresInHours = 24, ipAddress = null, userAgent = null) {
+    const { v7: uuidv7 } = await import('uuid');
     const token = await this.generateToken();
     const tokenHash = await this.hashToken(token);
     const expiresAt = new Date(Date.now() + (expiresInHours * 60 * 60 * 1000));
+    const tokenId = uuidv7();
 
-    // MySQL doesn't support .returning(), so we insert and then find by unique token_hash
     await db(this.tableName).insert({
+      id: tokenId,
       user_id: userId,
       token_hash: tokenHash,
       type: type,
@@ -46,9 +48,9 @@ class Token {
       updated_at: new Date()
     });
 
-    // Find the created token by token_hash (which is unique)
+    // Find the created token by ID
     const tokenRecord = await db(this.tableName)
-      .where('token_hash', tokenHash)
+      .where('id', tokenId)
       .first();
     
     return { token, record: new Token(tokenRecord) };
@@ -174,17 +176,19 @@ class Token {
 
   // Create API token with plain token storage
   static async createApiToken(tokenData) {
+    const { v7: uuidv7 } = await import('uuid');
+    const tokenId = uuidv7();
+    
     await db(this.tableName).insert({
+      id: tokenId,
       ...tokenData,
       created_at: new Date(),
       updated_at: new Date()
     });
 
-    // Find the created token
+    // Find the created token by ID
     const token = await db(this.tableName)
-      .where('user_id', tokenData.user_id)
-      .where('type', tokenData.type)
-      .orderBy('created_at', 'desc')
+      .where('id', tokenId)
       .first();
     
     return token ? new Token(token) : null;

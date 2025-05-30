@@ -1,4 +1,4 @@
-import { db } from '../db.js';
+import db from '../db.js';
 
 class User {
   constructor(data) {
@@ -39,12 +39,16 @@ class User {
   }
 
   static async create(userData) {
-    const [userId] = await db(this.tableName).insert({
+    const { v7: uuidv7 } = await import('uuid');
+    const id = uuidv7();
+    
+    await db(this.tableName).insert({
+      id,
       ...userData,
       created_at: new Date(),
       updated_at: new Date()
     });
-    return userId;
+    return id;
   }
 
   static async findAll() {
@@ -190,16 +194,29 @@ class User {
   }
 
   static async hasPermissionInNamespace(userId, permissionName, namespaceId) {
-    const permission = await db('permissions')
-      .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
-      .join('roles', 'role_permissions.role_id', 'roles.id')
-      .join('user_namespace_roles', 'roles.id', 'user_namespace_roles.role_id')
-      .where('user_namespace_roles.user_id', userId)
-      .where('user_namespace_roles.namespace_id', namespaceId)
-      .where('permissions.name', permissionName)
-      .first();
+    // Debug the parameters
+    console.log('hasPermissionInNamespace called with:', { userId, permissionName, namespaceId });
+    
+    // Check if any parameter is undefined
+    if (!userId || !permissionName || !namespaceId) {
+      console.error('Missing parameters in hasPermissionInNamespace:', { userId, permissionName, namespaceId });
+      return false;
+    }
 
-    return !!permission;
+    // Using raw query to avoid Knex schema issues with { db } import
+    const permission = await db.raw(`
+      SELECT p.* 
+      FROM permissions p
+      INNER JOIN role_permissions rp ON p.id = rp.permission_id
+      INNER JOIN roles r ON rp.role_id = r.id
+      INNER JOIN user_namespace_roles unr ON r.id = unr.role_id
+      WHERE unr.user_id = ? 
+        AND unr.namespace_id = ? 
+        AND p.name = ?
+      LIMIT 1
+    `, [userId, namespaceId, permissionName]);
+
+    return permission[0].length > 0;
   }
 
   // Update password

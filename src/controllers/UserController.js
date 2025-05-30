@@ -15,10 +15,8 @@ import db from '../db.js';
 
 const users = new Hono();
 
-// Apply authentication and namespace middleware to all routes
+// Apply authentication middleware to all routes
 users.use('*', authMiddleware);
-users.use('*', namespaceMiddleware);
-users.use('*', requireNamespace);
 
 // Apply rate limiting only to sensitive operations
 users.use('/*/delete', strictRateLimit);
@@ -29,7 +27,6 @@ users.post('/', strictRateLimit); // Only for create operations
  */
 users.get('/', requirePermission('user_index'), async (c) => {
   try {
-    // Using the new useCurrentNamespace helper (alternative to c.get('currentNamespace'))
     const currentNamespace = useCurrentNamespace(c);
     const page = parseInt(c.req.query('page')) || 1;
     const limit = parseInt(c.req.query('limit')) || 10;
@@ -38,40 +35,44 @@ users.get('/', requirePermission('user_index'), async (c) => {
     const sortBy = c.req.query('sortBy') || 'created_at';
     const sortOrder = c.req.query('sortOrder') || 'desc';
 
-    // Validate pagination parameters
-    if (page < 1 || limit < 1 || limit > 100) {
-      return c.json(
-        apiResponse.validation({
-          pagination: ['Invalid pagination parameters']
-        }),
-        400
-      );
-    }
-
-    // Validate sort parameters
     const validSortFields = ['id', 'name', 'email', 'status', 'created_at', 'updated_at', 'role_name'];
     const validSortOrders = ['asc', 'desc'];
-    
-    if (!validSortFields.includes(sortBy) || !validSortOrders.includes(sortOrder)) {
-      return c.json(
-        apiResponse.validation({
-          sort: ['Invalid sort parameters']
-        }),
-        400
-      );
+
+    if (page < 1 || limit < 1 || limit > 100) {
+      return c.json(apiResponse.validation({ pagination: ['Invalid pagination parameters'] }), 400);
     }
 
-    // Get users in current namespace with their roles
+    if (!validSortFields.includes(sortBy) || !validSortOrders.includes(sortOrder)) {
+      return c.json(apiResponse.validation({ sort: ['Invalid sort parameters'] }), 400);
+    }
+
     const offset = (page - 1) * limit;
-    
-    let query = db('user_namespace_roles')
+    const { user: currentUser } = getAuthData(c);
+
+    const orderColumn = ['role_name', 'role_display_name'].includes(sortBy)
+      ? sortBy
+      : sortBy;
+
+    const limitedUsersQuery = db('user_namespace_roles')
       .join('users', 'user_namespace_roles.user_id', 'users.id')
       .join('roles', 'user_namespace_roles.role_id', 'roles.id')
       .leftJoin('role_permissions', 'roles.id', 'role_permissions.role_id')
       .where('user_namespace_roles.namespace_id', currentNamespace.id)
+      .modify((qb) => {
+        if (search) {
+          qb.andWhere(function () {
+            this.where('users.name', 'like', `%${search}%`)
+              .orWhere('users.email', 'like', `%${search}%`)
+              .orWhere('users.username', 'like', `%${search}%`);
+          });
+        }
+        if (status) {
+          qb.andWhere('users.status', status);
+        }
+      })
       .groupBy(
         'users.id',
-        'users.name', 
+        'users.name',
         'users.username',
         'users.email',
         'users.password_hash',
@@ -89,60 +90,34 @@ users.get('/', requirePermission('user_index'), async (c) => {
         'roles.display_name as role_display_name',
         'user_namespace_roles.created_at as assigned_at',
         db.raw('COUNT(DISTINCT role_permissions.permission_id) as number_of_permissions')
-      );
-
-    let countQuery = db('user_namespace_roles')
-      .join('users', 'user_namespace_roles.user_id', 'users.id')
-      .where('user_namespace_roles.namespace_id', currentNamespace.id)
-      .count('* as total');
-
-    // Add search filters
-    if (search) {
-      const searchCondition = function() {
-        this.where('users.name', 'like', `%${search}%`)
-          .orWhere('users.email', 'like', `%${search}%`)
-          .orWhere('users.username', 'like', `%${search}%`);
-      };
-      query = query.where(searchCondition);
-      countQuery = countQuery.where(searchCondition);
-    }
-
-    // Add status filter
-    if (status) {
-      query = query.where('users.status', status);
-      countQuery = countQuery.where('users.status', status);
-    }
-
-    // Get total count
-    const [{ total }] = await countQuery;
-    
-    // Add sorting and pagination
-    let orderColumn;
-    if (sortBy === 'role_name') {
-      orderColumn = 'role_name';
-    } else if (sortBy === 'role_display_name') {
-      orderColumn = 'role_display_name';
-    } else {
-      orderColumn = sortBy;
-    }
-
-    query = query
+      )
       .orderBy(orderColumn, sortOrder)
       .limit(limit)
       .offset(offset);
 
-    // Get current user info for permission comparison
-    const { user: currentUser } = getAuthData(c);
-    const currentUserRole = await UserNamespaceRole.getRoleForUser(currentUser.id, currentNamespace.id);
-    const currentUserPermissions = currentUserRole ? await db('role_permissions')
-      .where('role_id', currentUserRole.id)
-      .select('permission_id') : [];
+    const countQuery = db('user_namespace_roles')
+      .join('users', 'user_namespace_roles.user_id', 'users.id')
+      .where('user_namespace_roles.namespace_id', currentNamespace.id)
+      .modify((qb) => {
+        if (search) {
+          qb.andWhere(function () {
+            this.where('users.name', 'like', `%${search}%`)
+              .orWhere('users.email', 'like', `%${search}%`)
+              .orWhere('users.username', 'like', `%${search}%`);
+          });
+        }
+        if (status) {
+          qb.andWhere('users.status', status);
+        }
+      })
+      .count('* as total');
+
+    const [{ total }] = await countQuery;
 
     const usersWithCanEdit = await db
-      .with('users_with_perms', query)
+      .with('limited_users', limitedUsersQuery)
       .with('current_user_permissions', qb =>
-        qb
-          .select('rp.permission_id')
+        qb.select('rp.permission_id')
           .from('user_namespace_roles as unr')
           .join('role_permissions as rp', 'rp.role_id', 'unr.role_id')
           .where('unr.user_id', currentUser.id)
@@ -150,54 +125,46 @@ users.get('/', requirePermission('user_index'), async (c) => {
           .distinct()
       )
       .with('target_user_permissions', qb =>
-        qb
-          .select('unr.user_id', 'rp.permission_id')
+        qb.select('unr.user_id', 'rp.permission_id')
           .from('user_namespace_roles as unr')
           .join('role_permissions as rp', 'rp.role_id', 'unr.role_id')
           .where('unr.namespace_id', currentNamespace.id)
+          .whereIn('unr.user_id', db.select('id').from('limited_users'))
       )
       .with('target_user_perm_counts', qb =>
-        qb
-          .select('user_id')
+        qb.select('user_id')
           .countDistinct({ perm_count: 'permission_id' })
           .from('target_user_permissions')
           .groupBy('user_id')
       )
       .with('current_user_perm_count', qb =>
-        qb
-          .select(db.raw('COUNT(DISTINCT permission_id) as perm_count'))
+        qb.select(db.raw('COUNT(DISTINCT permission_id) as perm_count'))
           .from('current_user_permissions')
       )
       .with('missing_permission_counts', qb =>
-        qb
-          .select('tup.user_id')
+        qb.select('tup.user_id')
           .count('* as missing_permissions')
-          .from(
-            db
-              .select('user_id', 'permission_id')
-              .from('target_user_permissions')
-              .as('tup')
-          )
+          .from(db.select('user_id', 'permission_id').from('target_user_permissions').as('tup'))
           .leftJoin('current_user_permissions as cup', 'tup.permission_id', 'cup.permission_id')
           .whereNull('cup.permission_id')
           .groupBy('tup.user_id')
       )
       .select(
-        'users_with_perms.*',
+        'limited_users.*',
         db.raw(`
-      CASE
-        WHEN users_with_perms.id = ? THEN 1
-        WHEN COALESCE(missing_permission_counts.missing_permissions, 0) = 0
-          AND target_user_perm_counts.perm_count < (SELECT perm_count FROM current_user_perm_count)
-        THEN 1
-        ELSE 0
-      END as can_edit
-    `, [currentUser.id])
+          CASE
+            WHEN limited_users.id = ? THEN 1
+            WHEN COALESCE(missing_permission_counts.missing_permissions, 0) = 0
+              AND target_user_perm_counts.perm_count < (SELECT perm_count FROM current_user_perm_count)
+            THEN 1
+            ELSE 0
+          END as can_edit
+        `, [currentUser.id])
       )
-      .from('users_with_perms')
-      .leftJoin('target_user_perm_counts', 'users_with_perms.id', 'target_user_perm_counts.user_id')
-      .leftJoin('missing_permission_counts', 'users_with_perms.id', 'missing_permission_counts.user_id')
-      .orderBy(orderColumn, sortOrder);
+      .from('limited_users')
+      .leftJoin('target_user_perm_counts', 'limited_users.id', 'target_user_perm_counts.user_id')
+      .leftJoin('missing_permission_counts', 'limited_users.id', 'missing_permission_counts.user_id')
+      .orderBy([{ column: orderColumn, order: sortOrder }, { column: 'id', order: 'asc' }]);
 
     const totalPages = Math.ceil(total / limit);
 
@@ -217,9 +184,9 @@ users.get('/', requirePermission('user_index'), async (c) => {
           full_path: currentNamespace.full_path
         },
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total: parseInt(total),
+          page,
+          limit,
+          total,
           totalPages,
           hasNext: page < totalPages,
           hasPrev: page > 1
@@ -227,15 +194,12 @@ users.get('/', requirePermission('user_index'), async (c) => {
       }, 'Users retrieved successfully'),
       200
     );
-
   } catch (error) {
     console.error('List users error:', error);
-    return c.json(
-      apiResponse.error('Failed to retrieve users'),
-      500
-    );
+    return c.json(apiResponse.error('Failed to retrieve users'), 500);
   }
 });
+
 
 /**
  * GET /api/users/:id - Get single user (namespace-aware)
@@ -407,8 +371,13 @@ users.post('/', requirePermission('user_create'), async (c) => {
 
     // Create user and assign to namespace in transaction
     const result = await db.transaction(async (trx) => {
+      // Generate UUID v7 for new user
+      const { v7: uuidv7 } = await import('uuid');
+      const userId = uuidv7();
+      
       // Create user (without role_id as it's namespace-specific now)
       const userData = {
+        id: userId,
         name: security.sanitizeInput(name),
         username: security.sanitizeInput(username.toLowerCase()),
         email: security.sanitizeInput(email.toLowerCase()),
@@ -419,22 +388,16 @@ users.post('/', requirePermission('user_create'), async (c) => {
 
       await trx('users').insert(userData);
       
-      // Get the created user by email
-      const createdUser = await trx('users').where('email', userData.email).first();
-      if (!createdUser) {
-        throw new Error('Failed to create user');
-      }
-      
       // Assign user to current namespace with specified role
       await trx('user_namespace_roles').insert({
-        user_id: createdUser.id,
+        user_id: userId,
         namespace_id: currentNamespace.id,
         role_id: role_id,
         created_at: new Date(),
         updated_at: new Date()
       });
       
-      return createdUser.id;
+      return userId;
     });
     
     const newUser = await User.findById(result);

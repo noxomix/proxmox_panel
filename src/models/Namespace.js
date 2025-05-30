@@ -1,5 +1,5 @@
 import db from '../db.js';
-import { v4 as uuidv4 } from 'uuid';
+import { v7 as uuidv7 } from 'uuid';
 
 class Namespace {
   static tableName = 'namespaces';
@@ -29,7 +29,7 @@ class Namespace {
   }
 
   static async create({ name, parent_id = null }) {
-    const id = uuidv4();
+    const id = uuidv7();
     let full_path = name;
     let depth = 0;
     

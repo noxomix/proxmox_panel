@@ -37,7 +37,9 @@
       "Bash(pkill:*)",
       "Bash(kill:*)",
       "Bash(bun run:*)",
-      "Bash(bun test:*)"
+      "Bash(bun test:*)",
+      "Bash(rg:*)",
+      "Bash(true)"
     ],
     "deny": []
   }

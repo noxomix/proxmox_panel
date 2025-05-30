@@ -1,4 +1,4 @@
-import { db } from '../db.js';
+import db from '../db.js';
 import { ROLE_CONFIG } from '../config/roles.js';
 
 export class Role {

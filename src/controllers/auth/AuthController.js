@@ -93,7 +93,9 @@ auth.post('/login', async (c) => {
       const userAgent = c.req.header('user-agent') || 'unknown';
       
       // Create session record with JWT tracking
+      const { v7: uuidv7 } = await import('uuid');
       const tokenData = {
+        id: uuidv7(),
         user_id: user.id,
         type: 'session',
         jwt_id: jwtUtils.decodeToken(jwtToken).jti,

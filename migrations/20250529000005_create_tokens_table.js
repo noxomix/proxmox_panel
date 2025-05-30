@@ -4,7 +4,7 @@
  */
 export const up = function(knex) {
   return knex.schema.createTable('tokens', function(table) {
-    table.uuid('id').primary().defaultTo(knex.raw('(UUID())'));
+    table.uuid('id').primary();
     table.uuid('user_id').notNullable();
     table.string('token_hash').nullable();
     table.string('jwt_id').nullable(); // For JWT session tracking
