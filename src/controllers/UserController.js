@@ -119,13 +119,13 @@ users.get('/', requirePermission('user_index'), async (c) => {
     // Add sorting and pagination
     let orderColumn;
     if (sortBy === 'role_name') {
-      orderColumn = 'roles.name';
+      orderColumn = 'role_name';
     } else if (sortBy === 'role_display_name') {
-      orderColumn = 'roles.display_name';
+      orderColumn = 'role_display_name';
     } else {
-      orderColumn = `users.${sortBy}`;
+      orderColumn = sortBy;
     }
-    
+
     query = query
       .orderBy(orderColumn, sortOrder)
       .limit(limit)
@@ -137,41 +137,67 @@ users.get('/', requirePermission('user_index'), async (c) => {
     const currentUserPermissions = currentUserRole ? await db('role_permissions')
       .where('role_id', currentUserRole.id)
       .select('permission_id') : [];
-    const currentUserPermissionIds = new Set(currentUserPermissions.map(p => p.permission_id));
 
-    // Use the existing query as subquery and extend it with can_edit logic
     const usersWithCanEdit = await db
       .with('users_with_perms', query)
+      .with('current_user_permissions', qb =>
+        qb
+          .select('rp.permission_id')
+          .from('user_namespace_roles as unr')
+          .join('role_permissions as rp', 'rp.role_id', 'unr.role_id')
+          .where('unr.user_id', currentUser.id)
+          .andWhere('unr.namespace_id', currentNamespace.id)
+          .distinct()
+      )
+      .with('target_user_permissions', qb =>
+        qb
+          .select('unr.user_id', 'rp.permission_id')
+          .from('user_namespace_roles as unr')
+          .join('role_permissions as rp', 'rp.role_id', 'unr.role_id')
+          .where('unr.namespace_id', currentNamespace.id)
+      )
+      .with('target_user_perm_counts', qb =>
+        qb
+          .select('user_id')
+          .countDistinct({ perm_count: 'permission_id' })
+          .from('target_user_permissions')
+          .groupBy('user_id')
+      )
+      .with('current_user_perm_count', qb =>
+        qb
+          .select(db.raw('COUNT(DISTINCT permission_id) as perm_count'))
+          .from('current_user_permissions')
+      )
+      .with('missing_permission_counts', qb =>
+        qb
+          .select('tup.user_id')
+          .count('* as missing_permissions')
+          .from(
+            db
+              .select('user_id', 'permission_id')
+              .from('target_user_permissions')
+              .as('tup')
+          )
+          .leftJoin('current_user_permissions as cup', 'tup.permission_id', 'cup.permission_id')
+          .whereNull('cup.permission_id')
+          .groupBy('tup.user_id')
+      )
       .select(
         'users_with_perms.*',
         db.raw(`
-      CASE 
+      CASE
         WHEN users_with_perms.id = ? THEN 1
-        WHEN users_with_perms.number_of_permissions >= ? THEN 0
-        WHEN (
-          SELECT COUNT(DISTINCT rp2.permission_id)
-          FROM role_permissions rp2
-          WHERE rp2.role_id IN (
-            SELECT role_id 
-            FROM user_namespace_roles unr2 
-            WHERE unr2.user_id = users_with_perms.id 
-              AND unr2.namespace_id = ?
-          )
-          ${currentUserPermissionIds.size > 0
-          ? `AND rp2.permission_id NOT IN (${Array.from(currentUserPermissionIds).map(() => '?').join(',')})`
-          : ''
-        }
-        ) = 0 THEN 1
+        WHEN COALESCE(missing_permission_counts.missing_permissions, 0) = 0
+          AND target_user_perm_counts.perm_count < (SELECT perm_count FROM current_user_perm_count)
+        THEN 1
         ELSE 0
-      END AS can_edit
-    `, [
-          currentUser.id,
-          currentUserPermissionIds.size,
-          currentNamespace.id,
-          ...Array.from(currentUserPermissionIds)
-        ])
+      END as can_edit
+    `, [currentUser.id])
       )
-      .from('users_with_perms');
+      .from('users_with_perms')
+      .leftJoin('target_user_perm_counts', 'users_with_perms.id', 'target_user_perm_counts.user_id')
+      .leftJoin('missing_permission_counts', 'users_with_perms.id', 'missing_permission_counts.user_id')
+      .orderBy(orderColumn, sortOrder);
 
     const totalPages = Math.ceil(total / limit);
 
