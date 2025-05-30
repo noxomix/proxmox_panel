@@ -67,12 +67,28 @@ users.get('/', requirePermission('user_index'), async (c) => {
     let query = db('user_namespace_roles')
       .join('users', 'user_namespace_roles.user_id', 'users.id')
       .join('roles', 'user_namespace_roles.role_id', 'roles.id')
+      .leftJoin('role_permissions', 'roles.id', 'role_permissions.role_id')
       .where('user_namespace_roles.namespace_id', currentNamespace.id)
+      .groupBy(
+        'users.id',
+        'users.name', 
+        'users.username',
+        'users.email',
+        'users.password_hash',
+        'users.role_id',
+        'users.status',
+        'users.created_at',
+        'users.updated_at',
+        'roles.name',
+        'roles.display_name',
+        'user_namespace_roles.created_at'
+      )
       .select(
         'users.*',
         'roles.name as role_name',
         'roles.display_name as role_display_name',
-        'user_namespace_roles.created_at as assigned_at'
+        'user_namespace_roles.created_at as assigned_at',
+        db.raw('COUNT(DISTINCT role_permissions.permission_id) as number_of_permissions')
       );
 
     let countQuery = db('user_namespace_roles')
@@ -115,34 +131,60 @@ users.get('/', requirePermission('user_index'), async (c) => {
       .limit(limit)
       .offset(offset);
 
-    // Execute query
-    const users = await query;
-    
-    const totalPages = Math.ceil(total / limit);
-    
-    // Add can_edit field for each user (namespace-aware)
-    // Since we pre-filtered by permission count, all returned users are potentially editable
+    // Get current user info for permission comparison
     const { user: currentUser } = getAuthData(c);
-    
-    const usersWithCanEdit = await Promise.all(
-      users.map(async (user) => {
-        const canEditProfile = currentUser.id === user.id;
-        const canEditOthers = currentUser.id !== user.id ? 
-          await PermissionHelper.canManageUserInNamespace(currentUser.id, user.id, currentNamespace.id) : false;
-        
-        return {
+    const currentUserRole = await UserNamespaceRole.getRoleForUser(currentUser.id, currentNamespace.id);
+    const currentUserPermissions = currentUserRole ? await db('role_permissions')
+      .where('role_id', currentUserRole.id)
+      .select('permission_id') : [];
+    const currentUserPermissionIds = new Set(currentUserPermissions.map(p => p.permission_id));
+
+    // Use the existing query as subquery and extend it with can_edit logic
+    const usersWithCanEdit = await db
+      .with('users_with_perms', query)
+      .select(
+        'users_with_perms.*',
+        db.raw(`
+      CASE 
+        WHEN users_with_perms.id = ? THEN 1
+        WHEN users_with_perms.number_of_permissions >= ? THEN 0
+        WHEN (
+          SELECT COUNT(DISTINCT rp2.permission_id)
+          FROM role_permissions rp2
+          WHERE rp2.role_id IN (
+            SELECT role_id 
+            FROM user_namespace_roles unr2 
+            WHERE unr2.user_id = users_with_perms.id 
+              AND unr2.namespace_id = ?
+          )
+          ${currentUserPermissionIds.size > 0
+          ? `AND rp2.permission_id NOT IN (${Array.from(currentUserPermissionIds).map(() => '?').join(',')})`
+          : ''
+        }
+        ) = 0 THEN 1
+        ELSE 0
+      END AS can_edit
+    `, [
+          currentUser.id,
+          currentUserPermissionIds.size,
+          currentNamespace.id,
+          ...Array.from(currentUserPermissionIds)
+        ])
+      )
+      .from('users_with_perms');
+
+    const totalPages = Math.ceil(total / limit);
+
+    return c.json(
+      apiResponse.success({
+        users: usersWithCanEdit.map(user => ({
           ...new User(user).toJSON(),
           role_name: user.role_name,
           role_display_name: user.role_display_name,
           assigned_at: user.assigned_at,
-          can_edit: canEditProfile || canEditOthers
-        };
-      })
-    );
-
-    return c.json(
-      apiResponse.success({
-        users: usersWithCanEdit,
+          number_of_permissions: parseInt(user.number_of_permissions) || 0,
+          can_edit: Boolean(user.can_edit)
+        })),
         namespace: {
           id: currentNamespace.id,
           name: currentNamespace.name,
