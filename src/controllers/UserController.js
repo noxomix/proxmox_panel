@@ -6,7 +6,6 @@ import { apiResponse } from '../utils/response.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
 import { namespaceMiddleware, requireNamespace } from '../middleware/namespace.js';
-import { useCurrentNamespace } from '../utils/namespaceHelper.js';
 import { getAuthData } from '../utils/authHelper.js';
 import { security } from '../utils/security.js';
 import { strictRateLimit } from '../middleware/rateLimiter.js';
@@ -18,6 +17,9 @@ const users = new Hono();
 // Apply authentication middleware to all routes
 users.use('*', authMiddleware);
 
+// Apply namespace middleware to all routes
+users.use('*', namespaceMiddleware);
+
 // Apply rate limiting only to sensitive operations
 users.use('/*/delete', strictRateLimit);
 users.post('/', strictRateLimit); // Only for create operations
@@ -27,7 +29,7 @@ users.post('/', strictRateLimit); // Only for create operations
  */
 users.get('/', requirePermission('user_index'), async (c) => {
   try {
-    const currentNamespace = useCurrentNamespace(c);
+    const currentNamespace = c.get('currentNamespace');
     const page = parseInt(c.req.query('page')) || 1;
     const limit = parseInt(c.req.query('limit')) || 10;
     const search = c.req.query('search') || '';

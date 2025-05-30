@@ -1,14 +1,16 @@
-import NamespaceHelper from '../utils/namespaceHelper.js';
+import { createNamespaceMiddleware } from '../utils/namespaceHelper.js';
 import UserNamespaceRole from '../models/UserNamespaceRole.js';
 import { apiResponse } from '../utils/response.js';
 import { getAuthData } from '../utils/authHelper.js';
 
 /**
- * Global namespace middleware using NamespaceHelper
- * Resolves namespace based on X-Namespace-ID header or domain mapping
- * Falls back to root namespace if no match found
+ * Global namespace middleware using the improved directive
+ * Resolves namespace based on priority:
+ * 1. X-Namespace-ID header
+ * 2. Domain mapping
+ * 3. Root namespace (lowest depth)
  */
-export const namespaceMiddleware = NamespaceHelper.middleware;
+export const namespaceMiddleware = createNamespaceMiddleware();
 
 /**
  * Middleware to require that a namespace context exists
@@ -81,7 +83,8 @@ export const optionalNamespaceSwitch = async (c, next) => {
     
     // If explicit namespace switch requested, validate access
     if (switchToNamespaceId) {
-      const targetNamespace = await NamespaceHelper.getCurrentNamespace(c.req);
+      const { useCurrentNamespace } = await import('../utils/namespaceHelper.js');
+      const targetNamespace = await useCurrentNamespace(c.req);
       
       if (targetNamespace && targetNamespace.id === switchToNamespaceId) {
         // Check if user has access to target namespace

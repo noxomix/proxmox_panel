@@ -12,6 +12,7 @@ import { PermissionHelper } from '../utils/permissionHelper.js';
 const roleController = new Hono();
 
 roleController.use('*', authMiddleware);
+roleController.use('*', namespaceMiddleware);
 
 /**
  * GET /api/roles/assignable - Get roles that current user can assign to others in current namespace

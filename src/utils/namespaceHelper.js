@@ -1,22 +1,18 @@
-import Namespace from '../models/Namespace.js';
+import db from '../db.js';
 
 /**
- * Global namespace resolution helper
- * Resolves namespace based on X-Namespace-ID header or domain
+ * Central namespace resolution directive
+ * Priority: X-Namespace-ID header > Domain mapping > Root namespace (lowest depth)
+ * 
+ * @param {Object} request - Hono request object
+ * @returns {Promise<Object|null>} Namespace object or null
  */
-export class NamespaceHelper {
-  /**
-   * Get current namespace based on request context
-   * Priority: X-Namespace-ID header > Domain mapping > Root namespace (depth 0)
-   * 
-   * @param {Object} request - Hono request object
-   * @returns {Promise<Object|null>} Namespace object or null
-   */
-  static async getCurrentNamespace(request) {
+export async function useCurrentNamespace(request) {
+  try {
     // 1. Check for explicit X-Namespace-ID header
     const namespaceId = request.header('X-Namespace-ID');
     if (namespaceId) {
-      const namespace = await Namespace.findById(namespaceId);
+      const namespace = await db('namespaces').where('id', namespaceId).first();
       if (namespace) {
         return namespace;
       }
@@ -30,14 +26,17 @@ export class NamespaceHelper {
       // Remove port number if present (e.g., localhost:3000 -> localhost)
       const domain = host.split(':')[0];
       
-      const namespaceByDomain = await Namespace.findByDomain(domain);
+      const namespaceByDomain = await db('namespaces').where('domain', domain).first();
       if (namespaceByDomain) {
         return namespaceByDomain;
       }
     }
 
-    // 3. Fallback to root namespace (depth 0)
-    const rootNamespace = await Namespace.findRoot();
+    // 3. Fallback to root namespace (lowest depth)
+    const rootNamespace = await db('namespaces')
+      .orderBy('depth', 'asc')
+      .first();
+      
     if (rootNamespace) {
       return rootNamespace;
     }
@@ -45,85 +44,70 @@ export class NamespaceHelper {
     // 4. No namespace found - this should never happen in a properly set up system
     console.error('No namespace could be resolved - no root namespace found!');
     return null;
+  } catch (error) {
+    console.error('Error in useCurrentNamespace:', error);
+    return null;
   }
+}
 
-  /**
-   * Middleware function to set current namespace in context
-   * 
-   * @param {Object} c - Hono context
-   * @param {Function} next - Next middleware function
-   */
-  static async middleware(c, next) {
-    const currentNamespace = await NamespaceHelper.getCurrentNamespace(c.req);
-    
-    if (!currentNamespace) {
+/**
+ * Middleware factory for namespace resolution
+ * Automatically resolves and sets namespace context based on priority
+ */
+export function createNamespaceMiddleware() {
+  return async (c, next) => {
+    try {
+      const namespace = await useCurrentNamespace(c.req);
+      
+      if (namespace) {
+        c.set('currentNamespace', namespace);
+      } else {
+        console.error('Critical: No namespace could be resolved');
+        return c.json({
+          success: false,
+          message: 'System error: No namespace context available',
+          meta: {
+            timestamp: new Date().toISOString(),
+            statusCode: 500
+          }
+        }, 500);
+      }
+      
+      await next();
+    } catch (error) {
+      console.error('Namespace middleware error:', error);
       return c.json({
         success: false,
-        message: 'No valid namespace could be resolved',
+        message: 'Failed to resolve namespace context',
         meta: {
           timestamp: new Date().toISOString(),
           statusCode: 500
         }
       }, 500);
     }
+  };
+}
 
-    // Set namespace in context for use in route handlers
-    c.set('currentNamespace', currentNamespace);
-    
-    await next();
+/**
+ * Legacy compatibility - will be removed
+ * @deprecated Use useCurrentNamespace() directly
+ */
+export class NamespaceHelper {
+  static async getCurrentNamespace(request) {
+    return await useCurrentNamespace(request);
   }
-
-  /**
-   * Hook function to get current namespace from context
-   * Use this in route handlers: const currentNamespace = useCurrentNamespace(c);
-   * 
-   * @param {Object} c - Hono context
-   * @returns {Object} Current namespace object
-   */
+  
   static useCurrentNamespace(c) {
     const namespace = c.get('currentNamespace');
     if (!namespace) {
-      throw new Error('No current namespace found in context. Make sure NamespaceHelper.middleware is applied.');
+      throw new Error('No current namespace found in context. Make sure namespace is set in context.');
     }
     return namespace;
   }
 
-  /**
-   * Get namespace hierarchy path for current namespace
-   * 
-   * @param {Object} c - Hono context
-   * @returns {Promise<Array>} Array of namespaces from root to current
-   */
-  static async getNamespaceHierarchy(c) {
-    const currentNamespace = NamespaceHelper.useCurrentNamespace(c);
-    return await Namespace.getHierarchy(currentNamespace.id);
-  }
-
-  /**
-   * Check if user has access to current namespace
-   * 
-   * @param {Object} c - Hono context
-   * @param {string} userId - User ID to check
-   * @returns {Promise<boolean>} True if user has access
-   */
-  static async userHasAccessToCurrentNamespace(c, userId) {
-    const currentNamespace = NamespaceHelper.useCurrentNamespace(c);
-    const UserNamespaceRole = (await import('../models/UserNamespaceRole.js')).default;
-    
-    const userRole = await UserNamespaceRole.getRoleForUser(userId, currentNamespace.id);
-    return !!userRole;
+  static get middleware() {
+    return createNamespaceMiddleware();
   }
 }
 
-/**
- * Convenience function to get current namespace
- * Use this in route handlers: const currentNamespace = useCurrentNamespace(c);
- * 
- * @param {Object} c - Hono context
- * @returns {Object} Current namespace object
- */
-export function useCurrentNamespace(c) {
-  return NamespaceHelper.useCurrentNamespace(c);
-}
-
-export default NamespaceHelper;
+export default { useCurrentNamespace, createNamespaceMiddleware, NamespaceHelper };
