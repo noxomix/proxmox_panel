@@ -183,6 +183,43 @@ class Namespace {
     return true;
   }
 
+  static async findByDomain(domain) {
+    const namespace = await db(this.tableName)
+      .where('domain', domain)
+      .first();
+    return namespace ? new Namespace(namespace) : null;
+  }
+
+  static async findRoot() {
+    const namespace = await db(this.tableName)
+      .where('depth', 0)
+      .whereNull('parent_id')
+      .first();
+    return namespace ? new Namespace(namespace) : null;
+  }
+
+  static async getHierarchy(namespaceId) {
+    const namespace = await this.findById(namespaceId);
+    if (!namespace) {
+      return [];
+    }
+
+    const hierarchy = [];
+    let current = namespace;
+    
+    // Build hierarchy from current namespace up to root
+    while (current) {
+      hierarchy.unshift(current);
+      if (current.parent_id) {
+        current = await this.findById(current.parent_id);
+      } else {
+        current = null;
+      }
+    }
+    
+    return hierarchy;
+  }
+
   // Namespace-aware user and role management methods
 
   static async getUsersWithRoles(namespaceId) {

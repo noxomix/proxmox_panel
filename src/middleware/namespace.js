@@ -1,41 +1,107 @@
-import Namespace from '../models/Namespace.js';
+import NamespaceHelper from '../utils/namespaceHelper.js';
 import UserNamespaceRole from '../models/UserNamespaceRole.js';
 import { apiResponse } from '../utils/response.js';
 import { getAuthData } from '../utils/authHelper.js';
-import db from '../db.js';
 
 /**
- * Middleware for optional namespace switching
- * Allows switching namespace context via X-Namespace-ID header
- * Falls back to current namespace if header not provided
+ * Global namespace middleware using NamespaceHelper
+ * Resolves namespace based on X-Namespace-ID header or domain mapping
+ * Falls back to root namespace if no match found
+ */
+export const namespaceMiddleware = NamespaceHelper.middleware;
+
+/**
+ * Middleware to require that a namespace context exists
+ * Should be used after namespaceMiddleware
+ */
+export const requireNamespace = async (c, next) => {
+  const currentNamespace = c.get('currentNamespace');
+  
+  if (!currentNamespace) {
+    return c.json({
+      success: false,
+      message: 'Namespace context required but not found',
+      meta: {
+        timestamp: new Date().toISOString(),
+        statusCode: 500
+      }
+    }, 500);
+  }
+
+  await next();
+};
+
+/**
+ * Middleware to ensure user has access to the current namespace
+ * Sets currentRole in context if user has access
+ */
+export const validateNamespaceAccess = async (c, next) => {
+  try {
+    const { user } = getAuthData(c);
+    const currentNamespace = c.get('currentNamespace');
+    
+    if (!currentNamespace) {
+      return c.json(
+        apiResponse.error('No namespace context available'),
+        500
+      );
+    }
+
+    // Check if user has access to current namespace
+    const userRole = await UserNamespaceRole.getRoleForUser(user.id, currentNamespace.id);
+    if (!userRole) {
+      return c.json(
+        apiResponse.forbidden(`User has no access to namespace: ${currentNamespace.name}`),
+        403
+      );
+    }
+
+    // Set role in context for use in route handlers
+    c.set('currentRole', userRole);
+    
+    await next();
+  } catch (error) {
+    console.error('Namespace access validation error:', error);
+    return c.json(
+      apiResponse.error('Failed to validate namespace access'),
+      500
+    );
+  }
+};
+
+/**
+ * Optional namespace switching middleware
+ * Allows explicit namespace switching via X-Namespace-ID header
+ * Validates user has access to target namespace
  */
 export const optionalNamespaceSwitch = async (c, next) => {
   try {
     const { user } = getAuthData(c);
-    let currentNamespace = c.get('currentNamespace');
-    let currentRole = c.get('currentRole');
-    
-    // Check if user wants to switch namespace
     const switchToNamespaceId = c.req.header('X-Namespace-ID');
     
-    if (switchToNamespaceId && switchToNamespaceId !== currentNamespace?.id) {
-      // Validate new namespace exists
-      const targetNamespace = await Namespace.findById(switchToNamespaceId);
-      if (!targetNamespace) {
-        return c.json(apiResponse.validation({ namespace: ['Invalid namespace ID'] }), 400);
-      }
+    // If explicit namespace switch requested, validate access
+    if (switchToNamespaceId) {
+      const targetNamespace = await NamespaceHelper.getCurrentNamespace(c.req);
       
-      // Check if user has access to target namespace
-      const userRole = await UserNamespaceRole.getRoleForUser(user.id, targetNamespace.id);
-      if (!userRole) {
-        return c.json(apiResponse.forbidden('User has no access to the specified namespace'), 403);
+      if (targetNamespace && targetNamespace.id === switchToNamespaceId) {
+        // Check if user has access to target namespace
+        const userRole = await UserNamespaceRole.getRoleForUser(user.id, targetNamespace.id);
+        if (!userRole) {
+          return c.json(
+            apiResponse.forbidden('User has no access to the specified namespace'),
+            403
+          );
+        }
+        
+        // Update context
+        c.set('currentNamespace', targetNamespace);
+        c.set('currentRole', userRole);
+      } else {
+        return c.json(
+          apiResponse.validation({ namespace: ['Invalid namespace ID'] }),
+          400
+        );
       }
-      
-      // Update context
-      currentNamespace = targetNamespace;
-      currentRole = userRole;
-      c.set('currentNamespace', currentNamespace);
-      c.set('currentRole', currentRole);
     }
     
     await next();
@@ -46,103 +112,8 @@ export const optionalNamespaceSwitch = async (c, next) => {
 };
 
 /**
- * Middleware that requires a specific namespace to be set
- * Used for namespace-specific operations
+ * Legacy middleware functions for backward compatibility
+ * @deprecated Use namespaceMiddleware instead
  */
-export const requireNamespace = async (c, next) => {
-  try {
-    const currentNamespace = c.get('currentNamespace');
-    
-    if (!currentNamespace) {
-      return c.json(apiResponse.error('Namespace context required. Please specify X-Namespace-ID header or access via namespace domain.'), 400);
-    }
-    
-    await next();
-  } catch (error) {
-    console.error('Namespace requirement error:', error);
-    return c.json(apiResponse.error('Namespace validation failed'), 500);
-  }
-};
-
-/**
- * Middleware for domain-based namespace detection
- * Checks if the request domain matches a namespace domain
- */
-export const domainNamespaceDetection = async (c, next) => {
-  try {
-    const { user } = getAuthData(c);
-    let currentNamespace = c.get('currentNamespace');
-    let currentRole = c.get('currentRole');
-    
-    // Only try domain detection if no namespace is set yet
-    if (!currentNamespace) {
-      const host = c.req.header('Host');
-      if (host) {
-        const domain = host.split(':')[0]; // Remove port if present
-        const domainNamespace = await db('namespaces').where('domain', domain).first();
-        
-        if (domainNamespace) {
-          // Check if user has access to this namespace
-          const userRole = await UserNamespaceRole.getRoleForUser(user.id, domainNamespace.id);
-          if (userRole) {
-            currentNamespace = domainNamespace;
-            currentRole = userRole;
-            c.set('currentNamespace', currentNamespace);
-            c.set('currentRole', currentRole);
-          }
-        }
-      }
-    }
-    
-    await next();
-  } catch (error) {
-    console.error('Domain namespace detection error:', error);
-    return c.json(apiResponse.error('Domain namespace detection failed'), 500);
-  }
-};
-
-/**
- * Middleware that ensures fallback to root namespace
- * Used as last resort if no other namespace context is available
- */
-export const ensureNamespaceContext = async (c, next) => {
-  try {
-    const { user } = getAuthData(c);
-    let currentNamespace = c.get('currentNamespace');
-    let currentRole = c.get('currentRole');
-    
-    // If still no namespace, try root namespace as fallback
-    if (!currentNamespace) {
-      const rootNamespace = await db('namespaces')
-        .where({ parent_id: null })
-        .first();
-        
-      if (rootNamespace) {
-        const userRole = await UserNamespaceRole.getRoleForUser(user.id, rootNamespace.id);
-        if (userRole) {
-          currentNamespace = rootNamespace;
-          currentRole = userRole;
-          c.set('currentNamespace', currentNamespace);
-          c.set('currentRole', currentRole);
-        }
-      }
-    }
-    
-    await next();
-  } catch (error) {
-    console.error('Namespace context ensure error:', error);
-    return c.json(apiResponse.error('Failed to establish namespace context'), 500);
-  }
-};
-
-/**
- * Combined namespace middleware that applies all namespace detection strategies
- * Use this for most routes that need namespace context
- */
-export const namespaceMiddleware = async (c, next) => {
-  await optionalNamespaceSwitch(c, async () => {
-    await domainNamespaceDetection(c, async () => {
-      await ensureNamespaceContext(c, next);
-    });
-  });
-};
+export const domainNamespaceDetection = namespaceMiddleware;
+export const ensureNamespaceContext = namespaceMiddleware;

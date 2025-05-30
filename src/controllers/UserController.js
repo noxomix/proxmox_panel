@@ -6,6 +6,7 @@ import { apiResponse } from '../utils/response.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
 import { namespaceMiddleware, requireNamespace } from '../middleware/namespace.js';
+import { useCurrentNamespace } from '../utils/namespaceHelper.js';
 import { getAuthData } from '../utils/authHelper.js';
 import { security } from '../utils/security.js';
 import { strictRateLimit } from '../middleware/rateLimiter.js';
@@ -28,7 +29,8 @@ users.post('/', strictRateLimit); // Only for create operations
  */
 users.get('/', requirePermission('user_index'), async (c) => {
   try {
-    const currentNamespace = c.get('currentNamespace');
+    // Using the new useCurrentNamespace helper (alternative to c.get('currentNamespace'))
+    const currentNamespace = useCurrentNamespace(c);
     const page = parseInt(c.req.query('page')) || 1;
     const limit = parseInt(c.req.query('limit')) || 10;
     const search = c.req.query('search') || '';
@@ -119,7 +121,9 @@ users.get('/', requirePermission('user_index'), async (c) => {
     const totalPages = Math.ceil(total / limit);
     
     // Add can_edit field for each user (namespace-aware)
+    // Since we pre-filtered by permission count, all returned users are potentially editable
     const { user: currentUser } = getAuthData(c);
+    
     const usersWithCanEdit = await Promise.all(
       users.map(async (user) => {
         const canEditProfile = currentUser.id === user.id;
