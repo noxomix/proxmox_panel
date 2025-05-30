@@ -7,7 +7,7 @@ import db from '../db.js';
  * @param {Object} request - Hono request object
  * @returns {Promise<Object|null>} Namespace object or null
  */
-export async function useCurrentNamespace(request) {
+export async function resolveNamespace(request) {
   try {
     // 1. Check for explicit X-Namespace-ID header
     const namespaceId = request.header('X-Namespace-ID');
@@ -57,7 +57,7 @@ export async function useCurrentNamespace(request) {
 export function createNamespaceMiddleware() {
   return async (c, next) => {
     try {
-      const namespace = await useCurrentNamespace(c.req);
+      const namespace = await resolveNamespace(c.req);
       
       if (namespace) {
         c.set('currentNamespace', namespace);
@@ -89,20 +89,29 @@ export function createNamespaceMiddleware() {
 }
 
 /**
+ * Get current namespace from context (for use in route handlers)
+ * @param {Object} c - Hono context
+ * @returns {Object} Current namespace object
+ */
+export function useNamespace(c) {
+  const namespace = c.get('currentNamespace');
+  if (!namespace) {
+    throw new Error('No current namespace found in context. Make sure namespace middleware is applied.');
+  }
+  return namespace;
+}
+
+/**
  * Legacy compatibility - will be removed
  * @deprecated Use useCurrentNamespace() directly
  */
 export class NamespaceHelper {
   static async getCurrentNamespace(request) {
-    return await useCurrentNamespace(request);
+    return await resolveNamespace(request);
   }
   
   static useCurrentNamespace(c) {
-    const namespace = c.get('currentNamespace');
-    if (!namespace) {
-      throw new Error('No current namespace found in context. Make sure namespace is set in context.');
-    }
-    return namespace;
+    return useNamespace(c);
   }
 
   static get middleware() {
@@ -110,4 +119,4 @@ export class NamespaceHelper {
   }
 }
 
-export default { useCurrentNamespace, createNamespaceMiddleware, NamespaceHelper };
+export default { resolveNamespace, useNamespace, createNamespaceMiddleware, NamespaceHelper };

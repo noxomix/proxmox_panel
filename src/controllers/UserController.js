@@ -10,6 +10,9 @@ import { getAuthData } from '../utils/authHelper.js';
 import { security } from '../utils/security.js';
 import { strictRateLimit } from '../middleware/rateLimiter.js';
 import { PermissionHelper } from '../utils/permissionHelper.js';
+import * as yup from 'yup';
+import { validate, searchfield, oneOfWithEmpty } from '../utils/validate.js';
+import { useNamespace } from '../utils/namespaceHelper.js';
 import db from '../db.js';
 
 const users = new Hono();
@@ -29,31 +32,25 @@ users.post('/', strictRateLimit); // Only for create operations
  */
 users.get('/', requirePermission('user_index'), async (c) => {
   try {
-    const currentNamespace = c.get('currentNamespace');
-    const page = parseInt(c.req.query('page')) || 1;
-    const limit = parseInt(c.req.query('limit')) || 10;
-    const search = c.req.query('search') || '';
-    const status = c.req.query('status') || '';
-    const sortBy = c.req.query('sortBy') || 'created_at';
-    const sortOrder = c.req.query('sortOrder') || 'desc';
+    const currentNamespace = useNamespace(c);
+    
+    // Validate and sanitize query parameters
+    const validation = await validate(c.req.query(), {
+      page: yup.number().integer().min(1).max(1000).default(1),
+      limit: yup.number().integer().min(1).max(100).default(10), 
+      search: searchfield(100),
+      status: oneOfWithEmpty('active', 'disabled', 'blocked'),
+      sortBy: yup.string().default('created_at').oneOf(['id', 'name', 'email', 'status', 'created_at', 'updated_at', 'role_name']),
+      sortOrder: yup.string().default('desc').oneOf(['asc', 'desc'])
+    });
 
-    const validSortFields = ['id', 'name', 'email', 'status', 'created_at', 'updated_at', 'role_name'];
-    const validSortOrders = ['asc', 'desc'];
-
-    if (page < 1 || limit < 1 || limit > 100) {
-      return c.json(apiResponse.validation({ pagination: ['Invalid pagination parameters'] }), 400);
+    if (!validation.isValid) {
+      return c.json(apiResponse.validation(validation.errors), 400);
     }
 
-    if (!validSortFields.includes(sortBy) || !validSortOrders.includes(sortOrder)) {
-      return c.json(apiResponse.validation({ sort: ['Invalid sort parameters'] }), 400);
-    }
-
+    const { page, limit, search, status, sortBy, sortOrder } = validation.valid;
     const offset = (page - 1) * limit;
     const { user: currentUser } = getAuthData(c);
-
-    const orderColumn = ['role_name', 'role_display_name'].includes(sortBy)
-      ? sortBy
-      : sortBy;
 
     const limitedUsersQuery = db('user_namespace_roles')
       .join('users', 'user_namespace_roles.user_id', 'users.id')
@@ -61,16 +58,17 @@ users.get('/', requirePermission('user_index'), async (c) => {
       .leftJoin('role_permissions', 'roles.id', 'role_permissions.role_id')
       .where('user_namespace_roles.namespace_id', currentNamespace.id)
       .modify((qb) => {
-        if (search) {
-          qb.andWhere(function () {
-            this.where('users.name', 'like', `%${search}%`)
-              .orWhere('users.email', 'like', `%${search}%`)
-              .orWhere('users.username', 'like', `%${search}%`);
+        if (search?.trim()) {
+          const safeTerm = `%${search}%`;
+          qb.andWhere(function() {
+            this.where('users.name', 'like', safeTerm)
+              .orWhere('users.email', 'like', safeTerm)
+              .orWhere('users.username', 'like', safeTerm);
           });
         }
-        if (status) {
-          qb.andWhere('users.status', status);
-        }
+      })
+      .modify((qb) => {
+        if (status) qb.andWhere('users.status', status);
       })
       .groupBy(
         'users.id',
@@ -93,7 +91,7 @@ users.get('/', requirePermission('user_index'), async (c) => {
         'user_namespace_roles.created_at as assigned_at',
         db.raw('COUNT(DISTINCT role_permissions.permission_id) as number_of_permissions')
       )
-      .orderBy(orderColumn, sortOrder)
+      .orderBy(sortBy, sortOrder)
       .limit(limit)
       .offset(offset);
 
@@ -101,16 +99,17 @@ users.get('/', requirePermission('user_index'), async (c) => {
       .join('users', 'user_namespace_roles.user_id', 'users.id')
       .where('user_namespace_roles.namespace_id', currentNamespace.id)
       .modify((qb) => {
-        if (search) {
-          qb.andWhere(function () {
-            this.where('users.name', 'like', `%${search}%`)
-              .orWhere('users.email', 'like', `%${search}%`)
-              .orWhere('users.username', 'like', `%${search}%`);
+        if (search?.trim()) {
+          const safeTerm = `%${search}%`;
+          qb.andWhere(function() {
+            this.where('users.name', 'like', safeTerm)
+              .orWhere('users.email', 'like', safeTerm)
+              .orWhere('users.username', 'like', safeTerm);
           });
         }
-        if (status) {
-          qb.andWhere('users.status', status);
-        }
+      })
+      .modify((qb) => {
+        if (status) qb.andWhere('users.status', status);
       })
       .count('* as total');
 
@@ -166,7 +165,7 @@ users.get('/', requirePermission('user_index'), async (c) => {
       .from('limited_users')
       .leftJoin('target_user_perm_counts', 'limited_users.id', 'target_user_perm_counts.user_id')
       .leftJoin('missing_permission_counts', 'limited_users.id', 'missing_permission_counts.user_id')
-      .orderBy([{ column: orderColumn, order: sortOrder }, { column: 'id', order: 'asc' }]);
+      .orderBy([{ column: sortBy, order: sortOrder }, { column: 'id', order: 'asc' }]);
 
     const totalPages = Math.ceil(total / limit);
 
@@ -209,7 +208,7 @@ users.get('/', requirePermission('user_index'), async (c) => {
 users.get('/:id', requirePermission('user_show'), async (c) => {
   try {
     const userId = c.req.param('id');
-    const currentNamespace = c.get('currentNamespace');
+    const currentNamespace = useNamespace(c);
     
     if (!userId || typeof userId !== 'string' || userId.length < 10) {
       return c.json(
@@ -269,7 +268,7 @@ users.get('/:id', requirePermission('user_show'), async (c) => {
  */
 users.post('/', requirePermission('user_create'), async (c) => {
   try {
-    const currentNamespace = c.get('currentNamespace');
+    const currentNamespace = useNamespace(c);
     const { user: currentUser } = getAuthData(c);
     const { name, username, email, password, role_id, status = 'active' } = await c.req.json();
 
@@ -436,7 +435,7 @@ users.post('/', requirePermission('user_create'), async (c) => {
 users.put('/:id', async (c) => {
   try {
     const userId = c.req.param('id');
-    const currentNamespace = c.get('currentNamespace');
+    const currentNamespace = useNamespace(c);
     const { user: currentUser } = getAuthData(c);
     const { name, email, username, role_id, status, password } = await c.req.json();
 
@@ -650,7 +649,7 @@ users.put('/:id', async (c) => {
 users.delete('/:id', requirePermission('user_delete'), async (c) => {
   try {
     const userId = c.req.param('id');
-    const currentNamespace = c.get('currentNamespace');
+    const currentNamespace = useNamespace(c);
     const { user: currentUser } = getAuthData(c);
 
     if (!userId || typeof userId !== 'string' || userId.length < 10) {
@@ -720,7 +719,7 @@ users.delete('/:id', requirePermission('user_delete'), async (c) => {
 users.get('/:id/permissions', requirePermission('user_permissions_view'), async (c) => {
   try {
     const userId = c.req.param('id');
-    const currentNamespace = c.get('currentNamespace');
+    const currentNamespace = useNamespace(c);
     
     if (!userId || typeof userId !== 'string' || userId.length < 10) {
       return c.json(
@@ -794,7 +793,7 @@ users.get('/:id/permissions', requirePermission('user_permissions_view'), async 
 users.post('/:id/assign-to-namespace', requirePermission('user_create'), async (c) => {
   try {
     const userId = c.req.param('id');
-    const currentNamespace = c.get('currentNamespace');
+    const currentNamespace = useNamespace(c);
     const { user: currentUser } = getAuthData(c);
     const { role_id } = await c.req.json();
 

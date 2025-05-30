@@ -83,8 +83,8 @@ export const optionalNamespaceSwitch = async (c, next) => {
     
     // If explicit namespace switch requested, validate access
     if (switchToNamespaceId) {
-      const { useCurrentNamespace } = await import('../utils/namespaceHelper.js');
-      const targetNamespace = await useCurrentNamespace(c.req);
+      const { resolveNamespace } = await import('../utils/namespaceHelper.js');
+      const targetNamespace = await resolveNamespace(c.req);
       
       if (targetNamespace && targetNamespace.id === switchToNamespaceId) {
         // Check if user has access to target namespace
