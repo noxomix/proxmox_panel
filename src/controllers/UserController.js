@@ -201,49 +201,66 @@ users.get('/', requirePermission('user_index'), async (c) => {
   }
 });
 
-
 /**
  * GET /api/users/:id - Get single user (namespace-aware)
  */
-users.get('/:id', requirePermission('user_show'), async (c) => {
+users.get('/:userId', requirePermission('user_show'), async (c) => {
   try {
-    const userId = c.req.param('id');
     const currentNamespace = useNamespace(c);
+    const { user: currentUser } = getAuthData(c);
     
-    if (!userId || typeof userId !== 'string' || userId.length < 10) {
-      return c.json(
-        apiResponse.validation({ id: ['Invalid user ID'] }),
-        400
-      );
+    // Validate path parameters
+    const validation = await validate(c.req.param(), {
+      userId: yup.string().required().min(10).matches(/^[0-9a-f-]+$/i, 'Must be a valid UUID')
+    });
+
+    if (!validation.isValid) {
+      return c.json(apiResponse.validation(validation.errors), 400);
     }
 
-    // Check if user exists in current namespace
-    const userInNamespace = await UserNamespaceRole.findByUserAndNamespace(userId, currentNamespace.id);
-    if (!userInNamespace) {
+    const { userId } = validation.valid;
+
+    // Get user with role in current namespace (single query with JOIN)
+    const userWithRole = await db('users')
+      .join('user_namespace_roles', 'users.id', 'user_namespace_roles.user_id')
+      .join('roles', 'user_namespace_roles.role_id', 'roles.id')
+      .where('users.id', userId)
+      .andWhere('user_namespace_roles.namespace_id', currentNamespace.id)
+      .select(
+        'users.*',
+        'roles.id as role_id',
+        'roles.name as role_name',
+        'roles.display_name as role_display_name',
+        'user_namespace_roles.created_at as assigned_at'
+      )
+      .first();
+
+    if (!userWithRole) {
       return c.json(
         apiResponse.error('User not found in this namespace'),
         404
       );
     }
 
-    const user = await User.findById(userId);
-    if (!user) {
-      return c.json(
-        apiResponse.error('User not found'),
-        404
-      );
+    // Check if current user can view this target user (permission hierarchy)
+    if (userId !== currentUser.id) {
+      const canManage = await PermissionHelper.canManageUserInNamespace(currentUser.id, userId, currentNamespace.id);
+      if (!canManage) {
+        return c.json(
+          apiResponse.forbidden('You cannot view users with equal or more permissions than your own in this namespace'),
+          403
+        );
+      }
     }
-
-    // Get user's role in current namespace
-    const userRole = await UserNamespaceRole.getRoleForUser(userId, currentNamespace.id);
 
     return c.json(
       apiResponse.success({
         user: {
-          ...user.toJSON(),
-          role_id: userRole?.id,
-          role_name: userRole?.name,
-          role_display_name: userRole?.display_name
+          ...new User(userWithRole).toJSON(),
+          role_id: userWithRole.role_id,
+          role_name: userWithRole.role_name,
+          role_display_name: userWithRole.role_display_name,
+          assigned_at: userWithRole.assigned_at
         },
         namespace: {
           id: currentNamespace.id,
@@ -270,120 +287,89 @@ users.post('/', requirePermission('user_create'), async (c) => {
   try {
     const currentNamespace = useNamespace(c);
     const { user: currentUser } = getAuthData(c);
-    const { name, username, email, password, role_id, status = 'active' } = await c.req.json();
-
-    // Validate required fields
-    const errors = {};
+    const requestBody = await c.req.json();
     
-    if (!name) {
-      errors.name = ['Name is required'];
-    } else if (!security.isValidName(name)) {
-      errors.name = ['Invalid name format'];
-    }
-
-    if (!username) {
-      errors.username = ['Username is required'];
-    } else if (!security.isValidUsername(username)) {
-      errors.username = ['Invalid username format'];
-    }
-
-    if (!email) {
-      errors.email = ['Email is required'];
-    } else if (!security.isValidEmail(email)) {
-      errors.email = ['Invalid email format'];
-    }
-
-    if (!password) {
-      errors.password = ['Password is required'];
-    } else {
-      const passwordValidation = security.validatePassword(password);
-      if (!passwordValidation.isValid) {
-        errors.password = passwordValidation.errors;
-      }
-    }
-
-    // Validate role_id - must be available in current namespace
-    if (!role_id) {
-      errors.role_id = ['Role is required'];
-    } else {
-      const Role = (await import('../models/Role.js')).Role;
-      const availableRoles = await Role.getAvailableInNamespace(currentNamespace.id);
-      const roleExists = availableRoles.find(r => r.id === role_id);
-      
-      if (!roleExists) {
-        errors.role_id = ['Role not available in this namespace'];
-      } else {
-        // Check if current user can assign this role
-        const canAssignRoles = await User.hasPermissionInNamespace(currentUser.id, 'user_role_assign', currentNamespace.id);
-        if (!canAssignRoles) {
-          errors.role_id = ['You do not have permission to assign user roles'];
-        } else {
-          const canAssign = await PermissionHelper.canAssignRoleInNamespace(currentUser.id, role_id, currentNamespace.id);
-          if (!canAssign) {
-            errors.role_id = ['You cannot assign a role with permissions you do not have'];
-          }
+    // Validate request body with Yup
+    const validation = await validate(requestBody, {
+      name: yup.string().required().test('valid-name', 'Invalid name format', value => security.isValidName(value)),
+      username: yup.string().required().test('valid-username', 'Invalid username format', value => security.isValidUsername(value)),
+      email: yup.string().required().test('valid-email', 'Invalid email format', value => security.isValidEmail(value)),
+      password: yup.string().required().test('valid-password', function(value) {
+        const validation = security.validatePassword(value);
+        if (!validation.isValid) {
+          return this.createError({ message: validation.errors.join(', ') });
         }
-      }
+        return true;
+      }),
+      role_id: yup.string().required().test('role-validation', 'Role validation failed', async function(value) {
+        try {
+          // Check if role exists in current namespace
+          const Role = (await import('../models/Role.js')).Role;
+          const availableRoles = await Role.getAvailableInNamespace(currentNamespace.id);
+          const roleExists = availableRoles.find(r => r.id === value);
+          
+          if (!roleExists) {
+            return this.createError({ message: 'Role not available in this namespace' });
+          }
+
+          // Check if current user can assign this role
+          const canAssignRoles = await User.hasPermissionInNamespace(currentUser.id, 'user_role_assign', currentNamespace.id);
+          if (!canAssignRoles) {
+            return this.createError({ message: 'You do not have permission to assign user roles' });
+          }
+
+          const canAssign = await PermissionHelper.canAssignRoleInNamespace(currentUser.id, value, currentNamespace.id);
+          if (!canAssign) {
+            return this.createError({ message: 'You cannot assign a role with permissions you do not have' });
+          }
+
+          return true;
+        } catch (error) {
+          console.error('Role validation error:', error);
+          return this.createError({ message: 'Role validation failed' });
+        }
+      }),
+      status: yup.string().default('active').oneOf(['active', 'disabled', 'blocked'])
+    });
+
+    if (!validation.isValid) {
+      return c.json(apiResponse.validation(validation.errors), 400);
     }
 
-    // Validate status
-    const validStatuses = ['active', 'disabled', 'blocked'];
-    if (status && !validStatuses.includes(status)) {
-      errors.status = ['Invalid status'];
-    }
+    const { name, username, email, password, role_id, status } = validation.valid;
 
-    if (Object.keys(errors).length > 0) {
-      return c.json(
-        apiResponse.validation(errors),
-        400
-      );
-    }
-
-    // Check if user already exists globally
-    const existingUserByEmail = await User.findByIdentity(email);
-    if (existingUserByEmail) {
-      return c.json(
-        apiResponse.validation({
-          email: ['Email already exists']
-        }),
-        400
-      );
-    }
-
-    const existingUserByUsername = await User.findByIdentity(username);
-    if (existingUserByUsername) {
-      return c.json(
-        apiResponse.validation({
-          username: ['Username already exists']
-        }),
-        400
-      );
-    }
-
-    // Hash password
-    const pepper = process.env.APPLICATION_SECRET;
-    if (!pepper) {
-      console.error('🔴 SECURITY WARNING: APPLICATION_SECRET not set!');
-      return c.json(apiResponse.error('Server configuration error'), 500);
-    }
-
-    const saltRounds = 12;
-    const hashedPassword = await bcrypt.hash(password + pepper, saltRounds);
-
-    // Create user and assign to namespace in transaction
+    // Create user and assign to namespace in transaction (prevents race conditions)
     const result = await db.transaction(async (trx) => {
       // Generate UUID v7 for new user
       const { v7: uuidv7 } = await import('uuid');
       const userId = uuidv7();
       
-      // Create user (without role_id as it's namespace-specific now)
+      // Check for duplicates within transaction (prevents race conditions)
+      const existingUserByEmail = await trx('users').where('email', email.toLowerCase()).first();
+      if (existingUserByEmail) {
+        throw new Error('EMAIL_EXISTS');
+      }
+
+      const existingUserByUsername = await trx('users').where('username', username.toLowerCase()).first();
+      if (existingUserByUsername) {
+        throw new Error('USERNAME_EXISTS');
+      }
+      
+      // Hash password with pepper
+      const pepper = process.env.APPLICATION_SECRET;
+      if (!pepper) {
+        throw new Error('APPLICATION_SECRET not configured');
+      }
+      const hashedPassword = await bcrypt.hash(password + pepper, 12);
+      
+      // Sanitize inputs (after validation to ensure clean data)
       const userData = {
         id: userId,
         name: security.sanitizeInput(name),
         username: security.sanitizeInput(username.toLowerCase()),
         email: security.sanitizeInput(email.toLowerCase()),
         password_hash: hashedPassword,
-        role_id: null, // We don't use this anymore
+        role_id: null,
         status
       };
 
@@ -422,6 +408,29 @@ users.post('/', requirePermission('user_create'), async (c) => {
 
   } catch (error) {
     console.error('Create user error:', error);
+    
+    // Handle specific validation errors
+    if (error.message === 'EMAIL_EXISTS') {
+      return c.json(
+        apiResponse.validation({ email: ['Email already exists'] }),
+        400
+      );
+    }
+    
+    if (error.message === 'USERNAME_EXISTS') {
+      return c.json(
+        apiResponse.validation({ username: ['Username already exists'] }),
+        400
+      );
+    }
+    
+    if (error.message === 'APPLICATION_SECRET not configured') {
+      return c.json(
+        apiResponse.error('Server configuration error'),
+        500
+      );
+    }
+    
     return c.json(
       apiResponse.error('Failed to create user'),
       500
