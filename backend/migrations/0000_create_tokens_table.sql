@@ -1,6 +1,6 @@
 CREATE TABLE `tokens` (
-	`id` varchar(36) NOT NULL,
-	`user_id` varchar(36) NOT NULL,
+	`id` varchar(40) NOT NULL,
+	`user_id` varchar(40) NOT NULL,
 	`token_hash` varchar(64) NOT NULL,
 	`type` enum('session','api') DEFAULT 'session',
 	`user_agent` text,

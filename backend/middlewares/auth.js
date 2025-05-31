@@ -3,7 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { db } from '../config/database.js';
 import { tokens } from '../schema/tokens.js';
 import { eq } from 'drizzle-orm';
-import crypto from 'crypto';
+import CryptoJS from 'crypto-js';
 
 // Create Hono JWT middleware instance
 const jwtMiddleware = jwt({
@@ -28,7 +28,7 @@ export const authMiddleware = async (c, next) => {
       throw new HTTPException(401, { message: 'No token provided' });
     }
     
-    const tokenHash = crypto.createHash('sha256').update(tokenFromHeader).digest('hex');
+    const tokenHash = CryptoJS.SHA256(tokenFromHeader).toString();
 
     // Validate session exists in database
     const session = await db

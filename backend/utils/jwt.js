@@ -1,6 +1,6 @@
 import { sign } from 'hono/jwt';
 import { v7 as uuidv7 } from 'uuid';
-import crypto from 'crypto';
+import CryptoJS from 'crypto-js';
 
 export const createJWT = async (userId, type = 'session', expiresIn = '24h') => {
   const tokenId = uuidv7();
@@ -36,11 +36,11 @@ export const createJWT = async (userId, type = 'session', expiresIn = '24h') => 
   return {
     token,
     tokenId,
-    tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+    tokenHash: CryptoJS.SHA256(token).toString(),
     expiresAt: new Date(exp * 1000)
   };
 };
 
 export const hashToken = (token) => {
-  return crypto.createHash('sha256').update(token).digest('hex');
+  return CryptoJS.SHA256(token).toString();
 };
