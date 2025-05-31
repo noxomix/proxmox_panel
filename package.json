@@ -8,20 +8,19 @@
     "bun": ">=1.0.0"
   },
   "scripts": {
-    "dev": "bun --watch src/index.js",
-    "kill-watch": "pkill -f 'bun.*--watch.*src/index.js' 2>/dev/null || true",
-    "start": "bun src/index.js",
-    "migrate": "bunx knex migrate:latest",
-    "migrate:rollback": "bunx knex migrate:rollback",
-    "migrate:make": "bunx knex migrate:make",
-    "seed": "bunx knex seed:run",
-    "seed:make": "bunx knex seed:make",
-    "fresh": "bunx knex migrate:rollback --all && bunx knex migrate:latest && bunx knex seed:run",
+    "dev": "cd backend && bun --watch src/index.js",
+    "kill-watch": "pkill -f 'bun.*--watch.*backend/src/index.js' 2>/dev/null || true",
+    "start": "cd backend && bun src/index.js",
+    "migrate": "cd backend && bun run db:migrate",
+    "migrate:rollback": "cd backend && bun run db:rollback",
+    "migrate:make": "cd backend && bun run db:generate",
+    "seed": "cd backend && bun run db:seed",
+    "fresh": "cd backend && bun run db:reset && bun run db:migrate && bun run db:seed",
     "dev:full": "concurrently \"bun run dev\" \"cd frontend && bun run dev\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
-    "test": "bun test --serial",
+    "test": "cd backend && bun test --serial",
     "frontend": "cd frontend && bun run dev",
-    "test:watch": "bun test --watch",
-    "test:coverage": "bun test --coverage"
+    "test:watch": "cd backend && bun test --watch",
+    "test:coverage": "cd backend && bun test --coverage"
   },
   "dependencies": {
     "@hono/node-server": "^1.14.3",

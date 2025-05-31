@@ -44,7 +44,8 @@
       "Bash(bun scripts/test-drizzle-migration.js:*)",
       "Bash(echo:*)",
       "Bash(git restore:*)",
-      "Bash(fuser:*)"
+      "Bash(fuser:*)",
+      "Bash(bun install:*)"
     ],
     "deny": []
   }
