@@ -1,8 +1,8 @@
 CREATE TABLE `users` (
 	`id` varchar(40) NOT NULL,
-	`name` varchar(255) NOT NULL,
 	`username` varchar(100) NOT NULL,
 	`email` varchar(255) NOT NULL,
+	`name` varchar(255) NOT NULL,
 	`password_hash` varchar(255) NOT NULL,
 	`status` enum('active','inactive','blocked') NOT NULL DEFAULT 'active',
 	`avatar` varchar(500),

@@ -1,8 +1,8 @@
 import { mysqlTable, varchar, timestamp, text, mysqlEnum, index } from 'drizzle-orm/mysql-core';
 
 export const tokens = mysqlTable('tokens', {
-  id: varchar('id', { length: 36 }).primaryKey(),
-  user_id: varchar('user_id', { length: 36 }).notNull(),
+  id: varchar('id', { length: 40 }).primaryKey(),
+  user_id: varchar('user_id', { length: 40 }).notNull(),
   token_hash: varchar('token_hash', { length: 64 }).notNull().unique(), // SHA-256 hash
   type: mysqlEnum('type', ['session', 'api']).default('session'),
   user_agent: text('user_agent'),
