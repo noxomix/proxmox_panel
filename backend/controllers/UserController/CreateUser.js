@@ -1,5 +1,3 @@
-import { db } from '../../config/database.js';
-
 export default async (c) => {
   try {
     const body = await c.req.json();
@@ -16,6 +14,9 @@ export default async (c) => {
       message: 'User created successfully'
     }, 201);
   } catch (error) {
-    throw error;
+    return c.json({
+      success: false,
+      message: 'Failed to create user'
+    }, 500);
   }
 };

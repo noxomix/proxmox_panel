@@ -1,5 +1,3 @@
-import { db } from '../../config/database.js';
-
 export default async (c) => {
   try {
     const user = c.get('user');
@@ -20,6 +18,9 @@ export default async (c) => {
       }
     });
   } catch (error) {
-    throw error;
+    return c.json({
+      success: false,
+      message: 'Failed to get user info'
+    }, 500);
   }
 };

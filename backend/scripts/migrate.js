@@ -7,7 +7,7 @@ async function migrate() {
   console.log('🚀 Starting database migration...');
   
   try {
-    const migrationsDir = join(process.cwd(), 'migrations');
+    const migrationsDir = join(process.cwd(), 'database/migrations');
     const files = await readdir(migrationsDir);
     
     // Filter and sort migration files

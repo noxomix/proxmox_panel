@@ -1,5 +1,3 @@
-import { db } from '../../config/database.js';
-
 export default async (c) => {
   try {
     // Placeholder implementation
@@ -18,6 +16,9 @@ export default async (c) => {
       }
     });
   } catch (error) {
-    throw error;
+    return c.json({
+      success: false,
+      message: 'Failed to fetch users'
+    }, 500);
   }
 };

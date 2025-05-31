@@ -1,5 +1,3 @@
-import { db } from '../../config/database.js';
-
 export default async (c) => {
   try {
     const id = c.req.param('id');
@@ -17,6 +15,9 @@ export default async (c) => {
       message: 'User updated successfully'
     });
   } catch (error) {
-    throw error;
+    return c.json({
+      success: false,
+      message: 'Failed to update user'
+    }, 500);
   }
 };

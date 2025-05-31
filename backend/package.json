@@ -21,6 +21,7 @@
     "db:push": "bunx drizzle-kit push",
     "db:studio": "bunx drizzle-kit studio --port 4001",
     "studio": "bunx drizzle-kit studio --port 4001",
+    "db:seed": "bun database/seeders/index.js",
     "lint": "echo 'Linting not configured yet'",
     "format": "echo 'Formatting not configured yet'"
   },

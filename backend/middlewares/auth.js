@@ -1,7 +1,7 @@
 import { jwt } from 'hono/jwt';
 import { HTTPException } from 'hono/http-exception';
 import { db } from '../config/database.js';
-import { tokens } from '../schema/tokens.js';
+import { tokens } from '../database/schemas/tokens.js';
 import { eq } from 'drizzle-orm';
 import { createHash } from 'crypto';
 
@@ -56,7 +56,6 @@ export const authMiddleware = async (c, next) => {
       token_id: sessionData.id,
       type: sessionData.type
     });
-    c.set('userId', sessionData.user_id);
     c.set('session', sessionData);
 
     await next();

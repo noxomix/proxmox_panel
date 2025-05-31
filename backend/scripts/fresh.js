@@ -33,7 +33,7 @@ async function fresh() {
   console.log('⚠️  This will rollback all tables and run all migrations!');
   
   try {
-    // Step 1: Rollback the database
+    // Step 1: Rollback the database (now with proper FK order)
     await runScript('db:rollback');
     
     // Step 2: Run migrations

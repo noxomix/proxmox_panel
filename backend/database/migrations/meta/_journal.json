@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1748701009808,
+      "tag": "0000_create_tokens_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1748701009809,
+      "tag": "0001_create_namespaces_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1748701009810,
+      "tag": "0002_create_users_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1748701009811,
+      "tag": "0003_create_roles_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1748701009812,
+      "tag": "0004_create_roles_namespaces_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1748701009813,
+      "tag": "0005_create_user_namespace_roles_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1748701009814,
+      "tag": "0006_create_permissions_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1748701009815,
+      "tag": "0007_create_role_permissions_table",
+      "breakpoints": true
+    }
+  ]
+}

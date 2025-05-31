@@ -1,5 +1,3 @@
-import { db } from '../../config/database.js';
-
 export default async (c) => {
   try {
     const { identity, password } = await c.req.json();
@@ -19,6 +17,9 @@ export default async (c) => {
       message: 'Login successful'
     });
   } catch (error) {
-    throw error;
+    return c.json({
+      success: false,
+      message: 'Login failed'
+    }, 500);
   }
 };

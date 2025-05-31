@@ -5,6 +5,8 @@ import { namespaces } from './namespaces.js';
 import { roles } from './roles.js';
 import { rolesNamespaces } from './rolesNamespaces.js';
 import { userNamespaceRoles } from './userNamespaceRoles.js';
+import { permissions } from './permissions.js';
+import { rolePermissions } from './rolePermissions.js';
 
 // User relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -40,7 +42,8 @@ export const rolesRelations = relations(roles, ({ one, many }) => ({
     references: [namespaces.id]
   }),
   rolesNamespaces: many(rolesNamespaces),
-  userNamespaceRoles: many(userNamespaceRoles)
+  userNamespaceRoles: many(userNamespaceRoles),
+  rolePermissions: many(rolePermissions)
 }));
 
 // RolesNamespaces relations
@@ -68,5 +71,22 @@ export const userNamespaceRolesRelations = relations(userNamespaceRoles, ({ one 
   role: one(roles, {
     fields: [userNamespaceRoles.role_id],
     references: [roles.id]
+  })
+}));
+
+// Permission relations
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+  rolePermissions: many(rolePermissions)
+}));
+
+// RolePermissions relations
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+  role: one(roles, {
+    fields: [rolePermissions.role_id],
+    references: [roles.id]
+  }),
+  permission: one(permissions, {
+    fields: [rolePermissions.permission_id],
+    references: [permissions.id]
   })
 }));

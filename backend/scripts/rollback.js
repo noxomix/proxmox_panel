@@ -7,14 +7,26 @@ async function rollback() {
   console.log('🔄 Starting database rollback...');
   
   try {
-    const rollbackDir = join(process.cwd(), 'migrations', 'down');
+    const rollbackDir = join(process.cwd(), 'database/migrations', 'down');
     const files = await readdir(rollbackDir);
     
-    // Filter and sort rollback files in reverse order (highest number first)
-    const rollbackFiles = files
-      .filter(file => file.endsWith('.sql') && !file.startsWith('.'))
-      .sort()
-      .reverse();
+    // Define proper rollback order based on foreign key dependencies
+    // Child tables first, parent tables last
+    const rollbackOrder = [
+      '0007_drop_role_permissions_table.sql',     // FK: roles + permissions
+      '0005_drop_user_namespace_roles_table.sql', // FK: users + namespaces + roles
+      '0000_drop_tokens_table.sql',               // FK: users
+      '0004_drop_roles_namespaces_table.sql',     // FK: roles + namespaces
+      '0003_drop_roles_table.sql',                // FK: namespaces
+      '0002_drop_users_table.sql',                // FK: namespaces
+      '0006_drop_permissions_table.sql',          // standalone
+      '0001_drop_namespaces_table.sql'            // root parent
+    ];
+    
+    // Filter to only include existing files in the correct order
+    const rollbackFiles = rollbackOrder.filter(file => 
+      files.includes(file)
+    );
     
     console.log(`📄 Found ${rollbackFiles.length} rollback files`);
     

@@ -11,8 +11,8 @@ const dbCredentials = {
 };
 
 export default defineConfig({
-  schema: './schema/index.js',
-  out: './migrations',
+  schema: './database/schemas/index.js',
+  out: './database/migrations',
   dialect: 'mysql',
   dbCredentials,
   verbose: true,

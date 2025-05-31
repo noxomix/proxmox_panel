@@ -1,8 +1,8 @@
 {
-  "name": "proxmox-panel-api",
+  "name": "proxmox-panel",
   "version": "1.0.0",
-  "description": "Hosting Control Panel API mit Hono",
-  "main": "src/index.js",
+  "description": "Proxmox Panel - Full-stack application with Bun, Hono, and Vue",
+  "main": "backend/index.js",
   "type": "module",
   "engines": {
     "bun": ">=1.0.0"
@@ -18,24 +18,13 @@
     "fresh": "cd backend && bun run db:fresh",
     "studio": "cd backend && bun run studio",
     "migrate:make": "cd backend && bun run db:generate",
-    "seed": "cd backend && bun run db:seed",
+    "seed": "cd backend && bun database/seeders/index.js",
     "test": "cd backend && bun test --serial",
     "frontend": "cd frontend && bun run dev",
     "test:watch": "cd backend && bun test --watch",
     "test:coverage": "cd backend && bun test --coverage"
   },
-  "dependencies": {
-    "@hono/node-server": "^1.14.3",
-    "bcryptjs": "^3.0.2",
-    "dotenv": "^16.5.0",
-    "hono": "^4.0.0",
-    "jsonwebtoken": "^9.0.2",
-    "knex": "^3.1.0",
-    "mysql2": "^3.14.1",
-    "sqlite3": "^5.1.7",
-    "uuid": "^11.1.0",
-    "yup": "^1.6.1"
-  },
+  "dependencies": {},
   "devDependencies": {
     "concurrently": "^9.1.2"
   }

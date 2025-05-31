@@ -1,5 +1,3 @@
-import { db } from '../../config/database.js';
-
 export default async (c) => {
   try {
     // Placeholder implementation
@@ -9,6 +7,9 @@ export default async (c) => {
       message: 'Logout successful'
     });
   } catch (error) {
-    throw error;
+    return c.json({
+      success: false,
+      message: 'Logout failed'
+    }, 500);
   }
 };
