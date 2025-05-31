@@ -496,8 +496,16 @@ auth.get('/profile', async (c) => {
       );
     }
 
-    // Get user role
-    const userRole = await User.getRole(user.id);
+    // Get user's namespaces and roles - use the namespace-aware method
+    const userNamespaces = await fullUser.getNamespaces();
+    
+    // For profile, we show the role from the root namespace or first available namespace
+    let userRole = null;
+    if (userNamespaces.length > 0) {
+      // Try to find root namespace first, otherwise use first available
+      const rootNamespaceAssignment = userNamespaces.find(ns => ns.namespace.name === 'root') || userNamespaces[0];
+      userRole = rootNamespaceAssignment?.role;
+    }
     
     return c.json(
       apiResponse.success({

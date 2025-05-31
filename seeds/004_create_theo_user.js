@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { v7 as uuidv7 } from 'uuid';
 
 /**
@@ -37,7 +37,6 @@ export const seed = async function(knex) {
       name: 'Theo',
       username: 'theo',
       email: 'theo@example.com',
-      role_id: adminRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
@@ -48,7 +47,6 @@ export const seed = async function(knex) {
       name: 'Anti Tamm',
       username: 'anti',
       email: 'anti@customer.com',
-      role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
@@ -58,7 +56,6 @@ export const seed = async function(knex) {
       name: 'Ion Popescu',
       username: 'ion',
       email: 'ion@customer.com',
-      role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
@@ -68,7 +65,6 @@ export const seed = async function(knex) {
       name: 'Manuel Silva',
       username: 'manuel',
       email: 'manuel@customer.com',
-      role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
@@ -78,7 +74,6 @@ export const seed = async function(knex) {
       name: 'Samuel Asante',
       username: 'samuel',
       email: 'samuel@customer.com',
-      role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
@@ -88,7 +83,6 @@ export const seed = async function(knex) {
       name: 'Carlos Pérez',
       username: 'carlos',
       email: 'carlos@customer.com',
-      role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     },
@@ -98,13 +92,75 @@ export const seed = async function(knex) {
       name: 'Ján Novák',
       username: 'jan',
       email: 'jan@customer.com',
-      role_id: customerRole.id,
       password_hash: hashedPassword,
       status: 'active'
     }
   ];
   
   await knex('users').insert(users);
+  
+  // Get root namespace
+  const rootNamespace = await knex('namespaces').where('name', 'root').first();
+  if (!rootNamespace) {
+    throw new Error('Root namespace not found. Please run namespace seeds first.');
+  }
+  
+  // Create user_namespace_roles assignments
+  const userRoleAssignments = [
+    // Theo gets admin role
+    {
+      user_id: users[0].id, // Theo
+      namespace_id: rootNamespace.id,
+      role_id: adminRole.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    // All others get customer role
+    {
+      user_id: users[1].id, // Anti
+      namespace_id: rootNamespace.id,
+      role_id: customerRole.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      user_id: users[2].id, // Ion
+      namespace_id: rootNamespace.id,
+      role_id: customerRole.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      user_id: users[3].id, // Manuel
+      namespace_id: rootNamespace.id,
+      role_id: customerRole.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      user_id: users[4].id, // Samuel
+      namespace_id: rootNamespace.id,
+      role_id: customerRole.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      user_id: users[5].id, // Carlos
+      namespace_id: rootNamespace.id,
+      role_id: customerRole.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    },
+    {
+      user_id: users[6].id, // Jan
+      namespace_id: rootNamespace.id,
+      role_id: customerRole.id,
+      created_at: new Date(),
+      updated_at: new Date()
+    }
+  ];
+  
+  await knex('user_namespace_roles').insert(userRoleAssignments);
   
   console.log('Users seeded successfully:');
   console.log('- theo (admin, German) - password "123"');

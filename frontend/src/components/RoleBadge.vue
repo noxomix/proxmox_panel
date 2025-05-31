@@ -38,6 +38,16 @@ export default {
         },
         roleConfig() {
             const roleName = this.roleName;
+            
+            // Special case for no role
+            if (!this.role || !roleName) {
+                return {
+                    badgeClass: "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400",
+                    iconClass: "w-3 h-3",
+                    icon: "UserIcon",
+                };
+            }
+            
             const configs = {
                 admin: {
                     badgeClass: "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400",

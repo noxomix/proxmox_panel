@@ -162,7 +162,7 @@
             {{ user.email }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
-            <RoleBadge :role="user.role_name ? { name: user.role_name, display_name: user.role_display_name } : null" />
+            <RoleBadge :role="user.role_id && user.role_name ? { name: user.role_name, display_name: user.role_display_name } : null" />
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
             <StatusBadge :status="user.status" />
@@ -476,6 +476,7 @@ export default {
     };
 
     const editUser = (user) => {
+      console.log('Edit user clicked - User object passed to modal:', user);
       selectedUser.value = user;
       showEditUser.value = true;
     };

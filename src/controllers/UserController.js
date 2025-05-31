@@ -52,11 +52,13 @@ users.get('/', requirePermission('user_index'), async (c) => {
     const offset = (page - 1) * limit;
     const { user: currentUser } = getAuthData(c);
 
-    const limitedUsersQuery = db('user_namespace_roles')
-      .join('users', 'user_namespace_roles.user_id', 'users.id')
-      .join('roles', 'user_namespace_roles.role_id', 'roles.id')
+    const limitedUsersQuery = db('users')
+      .leftJoin('user_namespace_roles', function() {
+        this.on('users.id', '=', 'user_namespace_roles.user_id')
+            .andOn('user_namespace_roles.namespace_id', '=', db.raw('?', [currentNamespace.id]));
+      })
+      .leftJoin('roles', 'user_namespace_roles.role_id', 'roles.id')
       .leftJoin('role_permissions', 'roles.id', 'role_permissions.role_id')
-      .where('user_namespace_roles.namespace_id', currentNamespace.id)
       .modify((qb) => {
         if (search?.trim()) {
           const safeTerm = `%${search}%`;
@@ -76,16 +78,17 @@ users.get('/', requirePermission('user_index'), async (c) => {
         'users.username',
         'users.email',
         'users.password_hash',
-        'users.role_id',
         'users.status',
         'users.created_at',
         'users.updated_at',
+        'roles.id',
         'roles.name',
         'roles.display_name',
         'user_namespace_roles.created_at'
       )
       .select(
         'users.*',
+        'roles.id as role_id',
         'roles.name as role_name',
         'roles.display_name as role_display_name',
         'user_namespace_roles.created_at as assigned_at',
@@ -95,9 +98,11 @@ users.get('/', requirePermission('user_index'), async (c) => {
       .limit(limit)
       .offset(offset);
 
-    const countQuery = db('user_namespace_roles')
-      .join('users', 'user_namespace_roles.user_id', 'users.id')
-      .where('user_namespace_roles.namespace_id', currentNamespace.id)
+    const countQuery = db('users')
+      .leftJoin('user_namespace_roles', function() {
+        this.on('users.id', '=', 'user_namespace_roles.user_id')
+            .andOn('user_namespace_roles.namespace_id', '=', db.raw('?', [currentNamespace.id]));
+      })
       .modify((qb) => {
         if (search?.trim()) {
           const safeTerm = `%${search}%`;
@@ -173,6 +178,7 @@ users.get('/', requirePermission('user_index'), async (c) => {
       apiResponse.success({
         users: usersWithCanEdit.map(user => ({
           ...new User(user).toJSON(),
+          role_id: user.role_id,
           role_name: user.role_name,
           role_display_name: user.role_display_name,
           assigned_at: user.assigned_at,
@@ -560,8 +566,19 @@ users.put('/:id', async (c) => {
     const namespaceUpdateData = {};
 
     // Validate role_id if provided (namespace-specific)
+    console.log('DEBUG: effectiveRoleId =', effectiveRoleId, 'original role_id =', role_id);
     if (effectiveRoleId !== undefined) {
-      if (effectiveRoleId) {
+      if (effectiveRoleId === null) {
+        // Explicitly setting role_id to null (unassign role)
+        // This requires permission check but no role validation
+        const canAssignRoles = await User.hasPermissionInNamespace(currentUser.id, 'user_role_assign', currentNamespace.id);
+        if (!canAssignRoles) {
+          errors.role_id = ['You do not have permission to assign user roles'];
+        } else {
+          namespaceUpdateData.role_id = null;
+        }
+      } else if (effectiveRoleId) {
+        // Assigning a specific role
         const Role = (await import('../models/Role.js')).Role;
         const availableRoles = await Role.getAvailableInNamespace(currentNamespace.id);
         const roleExists = availableRoles.find(r => r.id === effectiveRoleId);
@@ -582,6 +599,7 @@ users.put('/:id', async (c) => {
           }
         }
       } else {
+        // effectiveRoleId is empty string or other falsy value (but not null or undefined)
         errors.role_id = ['Role is required'];
       }
     }
@@ -614,13 +632,36 @@ users.put('/:id', async (c) => {
       }
 
       // Update namespace-specific role if changed
-      if (namespaceUpdateData.role_id) {
-        await trx('user_namespace_roles')
+      if ('role_id' in namespaceUpdateData) {
+        console.log('DEBUG: Updating role for user', userId, 'in namespace', currentNamespace.id, 'to role', namespaceUpdateData.role_id);
+        
+        // Check if user already has a role assignment in this namespace
+        const existingAssignment = await trx('user_namespace_roles')
           .where({ user_id: userId, namespace_id: currentNamespace.id })
-          .update({
+          .first();
+          
+        console.log('DEBUG: Existing assignment:', existingAssignment);
+          
+        if (existingAssignment) {
+          // Update existing assignment
+          console.log('DEBUG: Updating existing assignment');
+          await trx('user_namespace_roles')
+            .where({ user_id: userId, namespace_id: currentNamespace.id })
+            .update({
+              role_id: namespaceUpdateData.role_id,
+              updated_at: new Date()
+            });
+        } else {
+          // Insert new assignment
+          console.log('DEBUG: Inserting new assignment');
+          await trx('user_namespace_roles').insert({
+            user_id: userId,
+            namespace_id: currentNamespace.id,
             role_id: namespaceUpdateData.role_id,
+            created_at: new Date(),
             updated_at: new Date()
           });
+        }
       }
     });
 

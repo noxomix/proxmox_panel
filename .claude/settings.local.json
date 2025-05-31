@@ -39,7 +39,12 @@
       "Bash(bun run:*)",
       "Bash(bun test:*)",
       "Bash(rg:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(bunx:*)",
+      "Bash(bun scripts/test-drizzle-migration.js:*)",
+      "Bash(echo:*)",
+      "Bash(git restore:*)",
+      "Bash(fuser:*)"
     ],
     "deny": []
   }

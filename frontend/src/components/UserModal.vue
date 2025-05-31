@@ -3,7 +3,7 @@
     :show="show" 
     @close="handleClose"
     title="User Management"
-    maxWidth="max-w-2xl"
+    size="2xl"
   >
     <!-- Content -->
     <form @submit.prevent="save" class="space-y-6">

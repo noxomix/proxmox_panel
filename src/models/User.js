@@ -7,11 +7,10 @@ class User {
     this.username = data.username;
     this.email = data.email;
     this.password_hash = data.password_hash;
-    this.role_id = data.role_id;
     this.status = data.status;
     this.created_at = data.created_at;
     this.updated_at = data.updated_at;
-    // Include joined role data from pagination
+    // Include joined role data from pagination (from namespace context)
     this.role_name = data.role_name;
     this.role_display_name = data.role_display_name;
   }
@@ -76,42 +75,62 @@ class User {
     return userWithoutPassword;
   }
 
-  static async getRole(userId) {
-    const result = await db('users')
-      .join('roles', 'users.role_id', 'roles.id')
-      .where('users.id', userId)
+  static async getRole(userId, namespaceId) {
+    // Role is now namespace-specific, so namespaceId is required
+    if (!namespaceId) {
+      throw new Error('Namespace ID is required to get user role - use getRoleInNamespace instead');
+    }
+    const result = await db('user_namespace_roles')
+      .join('roles', 'user_namespace_roles.role_id', 'roles.id')
+      .where('user_namespace_roles.user_id', userId)
+      .where('user_namespace_roles.namespace_id', namespaceId)
       .select('roles.*')
       .first();
     return result;
   }
 
-  static async getPermissions(userId) {
+  static async getPermissions(userId, namespaceId) {
+    // Permissions are now namespace-specific
+    if (!namespaceId) {
+      throw new Error('Namespace ID is required to get user permissions');
+    }
     return await db('permissions')
       .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
-      .join('users', 'role_permissions.role_id', 'users.role_id')
-      .where('users.id', userId)
+      .join('user_namespace_roles', 'role_permissions.role_id', 'user_namespace_roles.role_id')
+      .where('user_namespace_roles.user_id', userId)
+      .where('user_namespace_roles.namespace_id', namespaceId)
       .select('permissions.*');
   }
 
-  static async hasPermission(userId, permissionName) {
+  static async hasPermission(userId, permissionName, namespaceId) {
+    // Permission check is now namespace-specific
+    if (!namespaceId) {
+      throw new Error('Namespace ID is required to check user permissions');
+    }
     const rolePermission = await db('permissions')
       .join('role_permissions', 'permissions.id', 'role_permissions.permission_id')
-      .join('users', 'role_permissions.role_id', 'users.role_id')
-      .where('users.id', userId)
+      .join('user_namespace_roles', 'role_permissions.role_id', 'user_namespace_roles.role_id')
+      .where('user_namespace_roles.user_id', userId)
+      .where('user_namespace_roles.namespace_id', namespaceId)
       .where('permissions.name', permissionName)
       .first();
 
     return !!rolePermission;
   }
 
-  static async assignRole(userId, roleId) {
-    await db('users')
-      .where('id', userId)
-      .update({
-        role_id: roleId,
-        updated_at: new Date()
-      });
-    return this.findById(userId);
+  static async assignRole(userId, roleId, namespaceId) {
+    // Role assignment is now namespace-specific
+    if (!namespaceId) {
+      throw new Error('Namespace ID is required to assign user role');
+    }
+    
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    
+    await user.assignToNamespace(namespaceId, roleId);
+    return user;
   }
 
   // Namespace-aware methods for multi-tenancy
@@ -248,16 +267,27 @@ class User {
     return await db(this.tableName).where('id', userId).del();
   }
 
-  // Paginated user list with search
-  static async paginate({ page = 1, limit = 10, search = '', status = '', sortBy = 'created_at', sortOrder = 'desc' }) {
+  // Paginated user list with search (DEPRECATED - use namespace-aware UserController instead)
+  static async paginate({ page = 1, limit = 10, search = '', status = '', sortBy = 'created_at', sortOrder = 'desc', namespaceId = null }) {
+    console.warn('User.paginate is deprecated - use namespace-aware UserController endpoint instead');
+    
+    if (!namespaceId) {
+      throw new Error('Namespace ID is required for user pagination');
+    }
+    
     const offset = (page - 1) * limit;
     
-    // Build base query with role join
-    let query = db(this.tableName)
-      .leftJoin('roles', 'users.role_id', 'roles.id')
+    // Build base query with namespace-aware role join
+    let query = db('user_namespace_roles')
+      .join('users', 'user_namespace_roles.user_id', 'users.id')
+      .leftJoin('roles', 'user_namespace_roles.role_id', 'roles.id')
+      .where('user_namespace_roles.namespace_id', namespaceId)
       .select('users.*', 'roles.name as role_name', 'roles.display_name as role_display_name');
     
-    let countQuery = db(this.tableName).count('* as total');
+    let countQuery = db('user_namespace_roles')
+      .join('users', 'user_namespace_roles.user_id', 'users.id')
+      .where('user_namespace_roles.namespace_id', namespaceId)
+      .count('* as total');
 
     // Add search filters
     if (search) {
