@@ -1,12 +1,9 @@
 import { Hono } from 'hono';
-import { serve } from '@hono/node-server';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { prettyJSON } from 'hono/pretty-json';
-import dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config();
+// Bun reads .env automatically - no need for dotenv
 
 // Import database connection
 import { connectDatabase } from './config/database.js';
@@ -16,7 +13,7 @@ import { setupRoutes } from './routes/index.js';
 
 // Import middlewares
 import { errorHandler } from './middlewares/errorHandler.js';
-import { authMiddleware } from './middlewares/auth.js';
+import { frontendProxyMiddleware } from './middlewares/frontendProxy.js';
 
 const app = new Hono();
 
@@ -24,11 +21,11 @@ const app = new Hono();
 app.use('*', logger());
 app.use('*', prettyJSON());
 
-/*/ CORS configuration
+// CORS configuration
 app.use('*', cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: process.env.CORS_CREDENTIALS === 'true'
-})); /*/
+}));
 
 // Rate limiting (disabled for now)
 // app.use('*', rateLimiter());
@@ -51,40 +48,30 @@ setupRoutes(app);
 // Global error handler
 app.use('*', errorHandler);
 
-// 404 handler
-app.notFound((c) => {
-  return c.json({
-    success: false,
-    data: null,
-    message: 'Route not found'
-  }, 404);
-});
+// Frontend proxy middleware (must be last - catches all unmatched routes)
+app.use('*', frontendProxyMiddleware);
 
-// Start server
-const startServer = async () => {
-  try {
-    // Test database connection
-    await connectDatabase();
-    console.log('✅ Database connection established');
-
-    const port = parseInt(process.env.PORT || '3000');
-    const host = process.env.HOST || '0.0.0.0';
-
-    console.log(`🚀 Starting server on ${host}:${port}`);
-    console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
-
-    serve({
-      fetch: app.fetch,
-      port,
-      hostname: host
-    });
-
-    console.log(`✅ Server running on http://${host}:${port}`);
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
+// Initialize database connection when server starts
+try {
+  await connectDatabase();
+  console.log('✅ Database connection established');
+  
+  const port = parseInt(process.env.PORT || '3000');
+  console.log(`🚀 Starting server on port ${port}`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 CORS Origin: ${process.env.CORS_ORIGIN || 'http://localhost:3000'}`);
+  
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`🔄 Frontend Proxy: ${process.env.FRONTEND_URL || 'http://localhost:3001'}`);
   }
-};
+} catch (error) {
+  console.error('❌ Failed to initialize server:', error);
+  process.exit(1);
+}
 
-startServer();
+// Export Bun-native server configuration
+export default {
+  port: parseInt(process.env.PORT || '3000'),
+  hostname: process.env.HOST || '0.0.0.0',
+  fetch: app.fetch,
+};

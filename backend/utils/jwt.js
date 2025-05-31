@@ -1,9 +1,8 @@
 import { sign } from 'hono/jwt';
-import { v7 as uuidv7 } from 'uuid';
-import CryptoJS from 'crypto-js';
+import { createHash } from 'crypto';
 
 export const createJWT = async (userId, type = 'session', expiresIn = '24h') => {
-  const tokenId = uuidv7();
+  const tokenId = Bun.randomUUIDv7();
   const now = Math.floor(Date.now() / 1000);
   
   // Calculate expiration
@@ -36,11 +35,11 @@ export const createJWT = async (userId, type = 'session', expiresIn = '24h') => 
   return {
     token,
     tokenId,
-    tokenHash: CryptoJS.SHA256(token).toString(),
+    tokenHash: createHash('sha256').update(token).digest('hex'),
     expiresAt: new Date(exp * 1000)
   };
 };
 
 export const hashToken = (token) => {
-  return CryptoJS.SHA256(token).toString();
+  return createHash('sha256').update(token).digest('hex');
 };

@@ -1,7 +1,6 @@
 import { defineConfig } from 'drizzle-kit';
-import dotenv from 'dotenv';
 
-dotenv.config();
+// Bun reads .env automatically
 
 const dbCredentials = {
   host: process.env.DB_HOST || 'localhost',

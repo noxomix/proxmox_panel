@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "cd backend && bun --watch index.js",
+    "dev:both": "concurrently \"cd frontend && bun run dev\" \"cd backend && bun --watch index.js\" --names \"frontend,backend\" --prefix-colors \"green,blue\"",
     "kill-watch": "pkill -f 'bun.*--watch.*backend/index.js' 2>/dev/null || true",
     "start": "cd backend && bun index.js",
     "migrate": "cd backend && bun run db:migrate",
@@ -18,7 +19,6 @@
     "studio": "cd backend && bun run studio",
     "migrate:make": "cd backend && bun run db:generate",
     "seed": "cd backend && bun run db:seed",
-    "dev:full": "concurrently \"bun run dev\" \"cd frontend && bun run dev\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
     "test": "cd backend && bun test --serial",
     "frontend": "cd frontend && bun run dev",
     "test:watch": "cd backend && bun test --watch",
