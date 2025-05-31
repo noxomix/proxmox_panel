@@ -46,13 +46,14 @@ roleController.get('/', requirePermission('roles_list'), async (c) => {
         const page = Math.max(1, parseInt(c.req.query('page')) || 1);
         const limit = Math.min(50, Math.max(1, parseInt(c.req.query('limit')) || 10));
         const search = security.sanitizeInput(c.req.query('search') || '');
+        const currentNamespace = c.get('currentNamespace');
         
         const result = await Role.paginate({ page, limit, search });
         
         // Load permissions and user count for each role
         for (const role of result.data) {
             role.permissions = await Role.getPermissions(role.id);
-            role.user_count = await Role.getUserCount(role.id);
+            role.user_count = await Role.getUserCount(role.id, currentNamespace.id);
         }
         
         return c.json(apiResponse.success(result, 'Roles retrieved successfully'));
@@ -163,7 +164,9 @@ roleController.put('/:id', requirePermission('roles_edit'), async (c) => {
 
         // Check if user is trying to modify their own role
         const currentUser = c.get('user');
-        if (currentUser.role_id === id) {
+        const currentNamespace = c.get('currentNamespace');
+        const currentUserRole = await User.getRole ? await User.getRole(currentUser.id, currentNamespace.id) : null;
+        if (currentUserRole && currentUserRole.id === id) {
             return c.json(apiResponse.error('You cannot modify your own role'), 403);
         }
 
@@ -258,7 +261,8 @@ roleController.delete('/:id', requirePermission('roles_delete'), async (c) => {
         }
 
         // Check if any users are assigned to this role
-        const userCount = await Role.getUserCount(id);
+        const currentNamespace = c.get('currentNamespace');
+        const userCount = await Role.getUserCount(id, currentNamespace.id);
         if (userCount > 0) {
             return c.json(
                 apiResponse.forbidden(`Cannot delete role. ${userCount} user(s) are still assigned to this role. Please reassign these users first.`),

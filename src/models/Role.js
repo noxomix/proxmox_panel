@@ -136,10 +136,16 @@ export class Role {
         };
     }
 
-    static async getUserCount(roleId) {
-        const result = await db('users')
-            .where('role_id', roleId)
-            .count('id as count')
+    static async getUserCount(roleId, namespaceId = null) {
+        let query = db('user_namespace_roles')
+            .where('role_id', roleId);
+            
+        if (namespaceId) {
+            query = query.where('namespace_id', namespaceId);
+        }
+        
+        const result = await query
+            .count('user_id as count')
             .first();
         return result.count;
     }
