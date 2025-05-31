@@ -1,0 +1,298 @@
+# Proxmox Panel Project Schema
+
+## Tech Stack
+- **Backend**: Hono.js (lightweight web framework) with Node.js
+- **Frontend**: Vue.js 3 with Composition API
+- **Database**: MySQL with Knex.js ORM
+- **Styling**: Tailwind CSS 4
+- **Authentication**: Hybrid JWT + database session validation
+- **Testing**: Jest with ES modules
+- **Build**: Vite for frontend bundling
+
+## Architecture Philosophy
+- **Clean Code**: Minimal, readable, maintainable
+- **Security First**: Rate limiting, input validation, session management
+- **Modular Components**: Reusable, self-contained UI components
+- **Separation of Concerns**: Clear boundaries between layers
+
+## Backend Structure (Hono.js)
+
+### Core Files
+- `src/index.js` - Main server entry point with Hono app
+- `src/db.js` - Database connection and configuration
+- `knexfile.js` - Database configuration and migrations
+
+### Controllers (Hono Routes)
+- `src/controllers/auth/AuthController.js` - Authentication endpoints
+  - Login/logout with JWT + session management
+  - Password change with pepper-based hashing
+  - API token generation and management
+  - Session management (list, revoke, revoke all)
+- `src/controllers/UserController.js` - User CRUD operations
+  - Paginated user listing with search/filters
+  - User creation, update, deletion
+  - Role and status management
+
+### Models
+- `src/models/User.js` - User model with static methods
+  - findById, findByEmail, findByIdentity
+  - create, update, delete
+  - paginate with search/filters
+- `src/models/Token.js` - Token/session model
+  - Session and API token management
+  - JWT ID tracking for session revocation
+  - Cleanup and expiration handling
+
+### Middleware
+- `src/middleware/auth.js` - Authentication middleware
+  - Hybrid JWT + database session validation
+  - Checks JWT validity AND database session existence
+  - Handles both new JWT system and legacy tokens
+- `src/middleware/rateLimiter.js` - Rate limiting protection
+  - IP, global, and user-based limits
+  - Configurable thresholds and time windows
+
+### Utilities
+- `src/utils/jwt.js` - JWT utilities (sign, verify, decode)
+- `src/utils/security.js` - Security validation and sanitization
+- `src/utils/response.js` - Standardized API response formatting
+- `src/utils/authHelper.js` - Authentication helper functions
+- `src/utils/securityMonitoring.js` - Security event tracking
+
+### Database
+- **Migration**: UUID-based user IDs, tokens table with jwt_id
+- **Seeding**: Admin user with pepper-based password hashing
+- **Security**: Password pepper using APPLICATION_SECRET environment variable
+
+## Frontend Structure (Vue.js 3 + Tailwind)
+
+### Core Files
+- `frontend/src/main.js` - Vue app initialization
+- `frontend/src/App.vue` - Root component with router-view
+- `frontend/src/routes.js` - Vue Router configuration
+- `frontend/src/style.css` - Global Tailwind imports
+
+### Layout System
+- `frontend/src/layouts/AppLayout.vue` - Main application layout
+  - Sidebar navigation with dark mode support
+  - Header with user menu and logout
+  - Responsive design with mobile sidebar toggle
+
+### Views (Pages)
+- `frontend/src/views/Login.vue` - Authentication page
+- `frontend/src/views/Dashboard.vue` - Main dashboard
+- `frontend/src/views/Users.vue` - User management with pagination
+- `frontend/src/views/Profile.vue` - User profile and session management
+- `frontend/src/views/Home.vue` - Landing/home page
+
+### Component Architecture
+
+#### Base Components (Reusable Primitives)
+- `BaseInput.vue` - Standardized text input with validation
+- `BaseCheckbox.vue` - Checkbox with consistent styling
+- `PasswordInput.vue` - Password field with show/hide toggle
+- `StatusBadge.vue` - Status indicators with color variants
+
+#### Functional Components
+- `ActionButton.vue` - Icon-only action buttons with variants
+  - Supports: edit, delete, impersonate, danger, warning
+  - Built-in ripple effects and accessibility
+- `PrimaryButton.vue` - Full buttons with text and icons
+- `CopyButton.vue` - Copy-to-clipboard functionality
+- `RippleEffect.vue` - Material Design ripple animations
+- `SidebarLink.vue` - Navigation link component
+- `SidebarToggle.vue` - Mobile sidebar toggle
+- `DarkModeToggle.vue` - Theme switching component
+
+#### Icon System (Modular SVG Components)
+**Pattern**: Each icon is a separate Vue component in `frontend/src/components/icons/`
+- Accepts `className` prop for Tailwind styling
+- Consistent sizing and structure
+- Examples:
+  - `CheckIcon.vue`, `ChevronDownIcon.vue`, `CopyIcon.vue`
+  - `DashboardIcon.vue`, `EyeIcon.vue`, `LockIcon.vue`
+  - `UserIcon.vue`, `SpinnerIcon.vue`, `RefreshIcon.vue`
+
+### Utilities
+- `frontend/src/utils/api.js` - HTTP client with authentication
+- `frontend/src/utils/darkMode.js` - Dark mode state management
+
+### Styling Guidelines (Tailwind CSS 4)
+- **Dark Mode**: Full dark/light theme support with `dark:` variants
+- **Responsive**: Mobile-first design with `sm:`, `md:`, `lg:` breakpoints
+- **Component Variants**: Consistent color schemes across components
+- **Animations**: Smooth transitions and hover effects
+- **Accessibility**: Focus states, ARIA labels, keyboard navigation
+
+## Security Implementation
+
+### Authentication Flow
+1. **Login**: Username/email + password with pepper
+2. **JWT Generation**: Includes user ID, type, and unique JTI
+3. **Session Storage**: Database record with JWT ID for revocation
+4. **Middleware Validation**: Checks both JWT validity AND database session
+5. **Session Revocation**: Deleting database record invalidates JWT
+
+### Security Features
+- **Rate Limiting**: Multiple layers (IP, global, user-based)
+- **Input Validation**: Sanitization and format validation
+- **Password Security**: Bcrypt + application secret pepper
+- **Session Management**: Proper logout and multi-device session control
+- **CSRF Protection**: JWT-based stateless authentication
+- **Security Monitoring**: Failed attempt tracking
+
+## Development Patterns
+
+### Component Development
+1. **Icons**: Create as separate .vue files with className prop
+2. **Reusability**: Extract common patterns into base components
+3. **Props Validation**: Use Vue prop validation for type safety
+4. **Composition API**: Prefer setup() function over Options API
+5. **Modular Structure**: Keep components focused and single-purpose
+
+### API Development
+1. **Hono Routes**: Group related endpoints in controller files
+2. **Middleware**: Apply authentication and rate limiting consistently
+3. **Response Format**: Use standardized apiResponse utility
+4. **Error Handling**: Comprehensive try-catch with proper HTTP codes
+5. **Validation**: Server-side validation before database operations
+
+### Database Patterns
+1. **Models**: Static methods for database operations
+2. **Migrations**: Version-controlled schema changes
+3. **Seeds**: Reproducible test data with proper password hashing
+4. **Transactions**: Use Knex transactions for complex operations
+
+## Testing Strategy
+- **Unit Tests**: Models, utilities, and core functions
+- **Integration Tests**: API endpoints with database
+- **Security Tests**: Authentication, authorization, and input validation
+- **Component Tests**: Vue component behavior and props
+
+## Configuration
+- **Environment Variables**: JWT_SECRET, APPLICATION_SECRET, database config
+- **Build Configuration**: Vite for frontend, npm scripts for backend
+- **Development Setup**: Hot reload for both frontend and backend
+- **Production**: Optimized builds with security headers
+
+## Key Design Decisions
+1. **Hybrid Authentication**: JWT + database validation for security
+2. **Component Modularity**: Icons and UI elements as separate components
+3. **Clean Architecture**: Clear separation between frontend/backend
+4. **Security First**: Multiple layers of protection and validation
+5. **Developer Experience**: Hot reload, clear error messages, good tooling
+
+This schema represents the current state and established patterns for the Proxmox Panel project.
+
+## Brand Colors & Design System
+
+The project uses a custom brand color palette defined in Tailwind 4 CSS-only configuration:
+
+### Brand Color Palette (RGB tuples for opacity support)
+- **brand-50**: `239 246 255` - Lightest shade
+- **brand-100**: `219 234 254` - Very light
+- **brand-200**: `191 219 254` - Light
+- **brand-300**: `147 197 253` - Light medium
+- **brand-400**: `96 165 250` - Medium light
+- **brand-500**: `59 130 246` - Base color (default blue)
+- **brand-600**: `37 99 235` - Primary action color
+- **brand-700**: `29 78 216` - Hover states
+- **brand-800**: `30 64 175` - Dark
+- **brand-900**: `30 58 138` - Darker
+- **brand-950**: `23 37 84` - Darkest
+
+### Usage Guidelines
+- **Primary Actions**: `bg-brand-600` with `hover:bg-brand-700`
+- **Focus States**: `focus:ring-brand-500`
+- **Text Links**: `text-brand-600 dark:text-brand-400`
+- **Borders**: `border-brand-600 dark:border-brand-400`
+
+### CSS Configuration
+Brand colors are defined in `/frontend/src/brand.css` using Tailwind's recommended approach for opacity support:
+
+1. **Base Variables** (`:root`): RGB comma-separated values (e.g., `--brand-600: 37, 99, 235`)
+2. **Tailwind @theme**: Direct variable references (e.g., `--color-brand-600: var(--brand-600)`)
+3. **Opacity Support**: Tailwind automatically creates `rgba(var(--brand-600), opacity)` for modifiers
+
+This approach enables full opacity functionality (e.g., `bg-brand-600/50`) while maintaining easy theming capability.
+
+### Design Consistency
+All interactive elements (buttons, links, form focus states) should use the brand color palette instead of default blue colors for consistent branding throughout the application.
+
+## Role-Based Access Control (RBAC) System
+
+### Core Permission System Architecture
+
+The system uses a **permission-based hierarchy** instead of fixed role hierarchies. Each user's effective permissions are the union of their role permissions and direct permissions.
+
+### Permission Hierarchy Rules
+
+#### 1. Proper Subset Rule
+- **Core Principle**: A user can only manage another user if they have a **proper superset** of that user's permissions
+- **Implementation**: `actorPermissions.length > targetPermissions.length && targetPermissions ⊆ actorPermissions`
+- **Example**: User with 10 permissions can manage user with 8 permissions (if all 8 are included in the 10)
+
+#### 2. Role Assignment Rules
+- **Rule**: Can only assign roles where you have ALL permissions the role grants
+- **Validation**: Role permissions must be a proper subset of actor's permissions
+- **Example**: To assign "Manager" role, you must have all Manager permissions plus at least one more
+
+#### 3. Permission Assignment Rules
+- **Direct Permissions**: Can only grant permissions you possess
+- **Total Validation**: Target's total permissions (role + direct) must remain a proper subset
+- **Self-Restriction**: Cannot modify own permissions
+
+### Database Structure
+
+#### Tables
+- **users**: id, name, email, username, password_hash, role_id, status
+- **roles**: id, name, display_name, description, is_system
+- **permissions**: id, name, display_name, description, category, is_system
+- **role_permissions**: role_id, permission_id
+- **user_permissions**: user_id, permission_id (direct permissions)
+
+### Permission Categories
+
+```
+Authentication:
+- login, api_token_generate
+
+User Management:
+- user_index, user_show, user_create, user_update, user_delete
+- user_role_assign, user_permissions_view, user_permissions_edit
+
+Role Management:
+- roles_list, role_create, role_update, role_delete
+- role_permissions_manage
+
+System:
+- system_settings, permissions_list
+```
+
+### Security Implementation
+
+#### Backend Validation
+1. **PermissionHelper.canManageUser()**: Validates proper superset
+2. **PermissionHelper.canAssignRole()**: Validates role assignment capability
+3. **PermissionHelper.validatePermissionAssignment()**: Ensures permission grants are valid
+
+#### Self-Edit Restrictions
+- **Allowed**: name, email, password
+- **Forbidden**: role_id, status, permissions
+
+#### UI/UX Implementation
+- **Role Dropdown**: Only shows assignable roles (proper subset check)
+- **Permission Checkboxes**: Disabled for role permissions, editable for direct
+- **Visual Feedback**: Clear indication of role vs direct permissions
+
+### Default Roles & Permissions
+
+1. **Admin**: All permissions
+2. **Manager**: User management + limited role viewing
+3. **Customer**: Basic login + API token generation
+4. **User**: Login only
+
+This permission-based system provides flexible, secure access control without hardcoded hierarchies.
+
+## Commands
+npm run fresh - freshup database and migrate + Seed
