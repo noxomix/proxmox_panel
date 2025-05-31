@@ -8,9 +8,9 @@
     "bun": ">=1.0.0"
   },
   "scripts": {
-    "dev": "cd backend && bun --watch src/index.js",
-    "kill-watch": "pkill -f 'bun.*--watch.*backend/src/index.js' 2>/dev/null || true",
-    "start": "cd backend && bun src/index.js",
+    "dev": "cd backend && bun --watch index.js",
+    "kill-watch": "pkill -f 'bun.*--watch.*backend/index.js' 2>/dev/null || true",
+    "start": "cd backend && bun index.js",
     "migrate": "cd backend && bun run db:migrate",
     "migrate:rollback": "cd backend && bun run db:rollback",
     "migrate:make": "cd backend && bun run db:generate",
