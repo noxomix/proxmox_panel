@@ -1,31 +1,63 @@
-import jwt from 'jsonwebtoken';
+import { jwt } from 'hono/jwt';
 import { HTTPException } from 'hono/http-exception';
+import { db } from '../config/database.js';
+import { tokens } from '../schema/tokens.js';
+import { eq } from 'drizzle-orm';
+import crypto from 'crypto';
+
+// Create Hono JWT middleware instance
+const jwtMiddleware = jwt({
+  secret: process.env.JWT_SECRET || 'dev-jwt-secret-change-this-in-production-min-32-chars'
+});
 
 export const authMiddleware = async (c, next) => {
   try {
-    const authHeader = c.req.header('Authorization');
+    // First, validate JWT with Hono's middleware
+    await jwtMiddleware(c, async () => {});
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new HTTPException(401, { message: 'No valid authorization header' });
+    // Get payload from Hono JWT middleware
+    const payload = c.get('jwtPayload');
+    
+    if (!payload || !payload.token_id) {
+      throw new HTTPException(401, { message: 'Invalid token payload' });
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    
-    if (!token) {
+    // Create token hash for database lookup
+    const tokenFromHeader = c.req.header('Authorization')?.substring(7);
+    if (!tokenFromHeader) {
       throw new HTTPException(401, { message: 'No token provided' });
     }
+    
+    const tokenHash = crypto.createHash('sha256').update(tokenFromHeader).digest('hex');
 
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      throw new Error('JWT_SECRET environment variable not set');
+    // Validate session exists in database
+    const session = await db
+      .select()
+      .from(tokens)
+      .where(eq(tokens.token_hash, tokenHash))
+      .limit(1);
+
+    if (!session.length) {
+      throw new HTTPException(401, { message: 'Session not found or expired' });
     }
 
-    const decoded = jwt.verify(token, jwtSecret);
-    
-    // Add user info to context
-    c.set('user', decoded);
-    c.set('userId', decoded.id);
-    c.set('token', token);
+    const sessionData = session[0];
+
+    // Check if session is expired
+    if (sessionData.expires_at && new Date() > sessionData.expires_at) {
+      // Clean up expired session
+      await db.delete(tokens).where(eq(tokens.id, sessionData.id));
+      throw new HTTPException(401, { message: 'Session expired' });
+    }
+
+    // Add session info to context
+    c.set('user', { 
+      id: sessionData.user_id,
+      token_id: sessionData.id,
+      type: sessionData.type
+    });
+    c.set('userId', sessionData.user_id);
+    c.set('session', sessionData);
 
     await next();
   } catch (error) {
@@ -33,12 +65,9 @@ export const authMiddleware = async (c, next) => {
       throw error;
     }
     
-    if (error.name === 'JsonWebTokenError') {
+    // Handle Hono JWT errors
+    if (error.message?.includes('Invalid JWT')) {
       throw new HTTPException(401, { message: 'Invalid token' });
-    }
-    
-    if (error.name === 'TokenExpiredError') {
-      throw new HTTPException(401, { message: 'Token expired' });
     }
     
     throw new HTTPException(401, { message: 'Authentication failed' });
@@ -48,21 +77,9 @@ export const authMiddleware = async (c, next) => {
 // Optional auth middleware (doesn't throw if no token)
 export const optionalAuthMiddleware = async (c, next) => {
   try {
-    const authHeader = c.req.header('Authorization');
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      
-      if (token && process.env.JWT_SECRET) {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        c.set('user', decoded);
-        c.set('userId', decoded.id);
-        c.set('token', token);
-      }
-    }
+    await authMiddleware(c, next);
   } catch (error) {
     // Silently ignore auth errors in optional middleware
+    await next();
   }
-  
-  await next();
 };

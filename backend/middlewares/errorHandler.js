@@ -1,4 +1,5 @@
 import { HTTPException } from 'hono/http-exception';
+import * as process from "hono/dist/types/helper/adapter/index.js";
 
 export const errorHandler = async (c, next) => {
   try {

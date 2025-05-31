@@ -17,7 +17,6 @@ import { setupRoutes } from './routes/index.js';
 // Import middlewares
 import { errorHandler } from './middlewares/errorHandler.js';
 import { authMiddleware } from './middlewares/auth.js';
-import { rateLimiter } from './middlewares/rateLimiter.js';
 
 const app = new Hono();
 
@@ -25,11 +24,11 @@ const app = new Hono();
 app.use('*', logger());
 app.use('*', prettyJSON());
 
-// CORS configuration
+/*/ CORS configuration
 app.use('*', cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: process.env.CORS_CREDENTIALS === 'true'
-}));
+})); /*/
 
 // Rate limiting (disabled for now)
 // app.use('*', rateLimiter());

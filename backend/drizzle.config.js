@@ -1,6 +1,5 @@
 import { defineConfig } from 'drizzle-kit';
 import dotenv from 'dotenv';
-import * as process from "hono/dist/types/helper/adapter/index.js";
 
 dotenv.config();
 
